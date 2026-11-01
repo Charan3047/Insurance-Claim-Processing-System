@@ -1,0 +1,407 @@
+[
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000004",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2024-08-18 < policy start 2025-01-16",
+    "related_entity_id": "INC-2026-001151",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000005",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2024-09-23 < policy start 2024-12-30",
+    "related_entity_id": "INC-2026-001152",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000010",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2024-12-01 < policy start 2025-02-21",
+    "related_entity_id": "INC-2026-001153",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000015",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2025-06-21 < policy start 2025-11-24",
+    "related_entity_id": "INC-2026-001154",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000016",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2026-01-31 < policy start 2026-06-03",
+    "related_entity_id": "INC-2026-001155",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000017",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2023-11-28 < policy start 2024-11-11",
+    "related_entity_id": "INC-2026-001156",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000019",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2023-10-20 < policy start 2024-09-17",
+    "related_entity_id": "INC-2026-001157",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000023",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2024-05-22 < policy start 2025-01-13",
+    "related_entity_id": "INC-2026-001158",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000025",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2025-08-11 < policy start 2025-09-16",
+    "related_entity_id": "INC-2026-001159",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000039",
+    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+    "expected_decision": "DENY",
+    "description": "Incident date 2024-12-23 < policy start 2025-10-23",
+    "related_entity_id": "INC-2026-001160",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000851",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-TRAVEL-2026-000005 cancelled 2024-07-23, incident 2024-07-30",
+    "related_entity_id": "POL-TRAVEL-2026-000005",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000305",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-HOME-2026-000013 cancelled 2025-01-21, incident 2025-02-10",
+    "related_entity_id": "POL-HOME-2026-000013",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000855",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-TRAVEL-2026-000016 cancelled 2026-08-05, incident 2026-10-02",
+    "related_entity_id": "POL-TRAVEL-2026-000016",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000048",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-AUTO-2026-000034 cancelled 2025-09-25, incident 2025-10-29",
+    "related_entity_id": "POL-AUTO-2026-000034",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000867",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-TRAVEL-2026-000039 cancelled 2025-01-21, incident 2025-02-09",
+    "related_entity_id": "POL-TRAVEL-2026-000039",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000753",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-LIFE-2026-000040 cancelled 2025-04-20, incident 2025-05-13",
+    "related_entity_id": "POL-LIFE-2026-000040",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000754",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-LIFE-2026-000052 cancelled 2026-08-18, incident 2026-08-27",
+    "related_entity_id": "POL-LIFE-2026-000052",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000757",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-LIFE-2026-000059 cancelled 2025-02-06, incident 2025-03-11",
+    "related_entity_id": "POL-LIFE-2026-000059",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000050",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-AUTO-2026-000069 cancelled 2027-03-08, incident 2027-04-06",
+    "related_entity_id": "POL-AUTO-2026-000069",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000871",
+    "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "expected_decision": "DENY",
+    "description": "Policy POL-TRAVEL-2026-000073 cancelled 2026-02-01, incident 2026-02-24",
+    "related_entity_id": "POL-TRAVEL-2026-000073",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "INCIDENT",
+    "entity_id": "INC-2026-001171",
+    "issue_type": "DUPLICATE_INCIDENT",
+    "expected_decision": "FLAG_DUPLICATE",
+    "description": "Duplicate of incident INC-2026-000001",
+    "related_entity_id": "INC-2026-000001",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "INCIDENT",
+    "entity_id": "INC-2026-001172",
+    "issue_type": "DUPLICATE_INCIDENT",
+    "expected_decision": "FLAG_DUPLICATE",
+    "description": "Duplicate of incident INC-2026-000002",
+    "related_entity_id": "INC-2026-000002",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "INCIDENT",
+    "entity_id": "INC-2026-001173",
+    "issue_type": "DUPLICATE_INCIDENT",
+    "expected_decision": "FLAG_DUPLICATE",
+    "description": "Duplicate of incident INC-2026-000003",
+    "related_entity_id": "INC-2026-000003",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "INCIDENT",
+    "entity_id": "INC-2026-001174",
+    "issue_type": "DUPLICATE_INCIDENT",
+    "expected_decision": "FLAG_DUPLICATE",
+    "description": "Duplicate of incident INC-2026-000004",
+    "related_entity_id": "INC-2026-000004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "INCIDENT",
+    "entity_id": "INC-2026-001175",
+    "issue_type": "DUPLICATE_INCIDENT",
+    "expected_decision": "FLAG_DUPLICATE",
+    "description": "Duplicate of incident INC-2026-000005",
+    "related_entity_id": "INC-2026-000005",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000061-001",
+    "issue_type": "SETTLEMENT_EXCEEDS_LIMIT",
+    "expected_decision": "CAP_TO_LIMIT",
+    "description": "Settlement 108972.3 > limit 74412.57",
+    "related_entity_id": "COV-POL-AUTO-2026-001769-001",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000073-001",
+    "issue_type": "SETTLEMENT_EXCEEDS_LIMIT",
+    "expected_decision": "CAP_TO_LIMIT",
+    "description": "Settlement 460327.52 > limit 307739.37",
+    "related_entity_id": "COV-POL-AUTO-2026-001841-003",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000078-001",
+    "issue_type": "SETTLEMENT_EXCEEDS_LIMIT",
+    "expected_decision": "CAP_TO_LIMIT",
+    "description": "Settlement 168690.47 > limit 120738.31",
+    "related_entity_id": "COV-POL-AUTO-2026-001018-004",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000083-001",
+    "issue_type": "SETTLEMENT_EXCEEDS_LIMIT",
+    "expected_decision": "CAP_TO_LIMIT",
+    "description": "Settlement 167320.92 > limit 137714.78",
+    "related_entity_id": "COV-POL-AUTO-2026-000240-002",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000091-001",
+    "issue_type": "SETTLEMENT_EXCEEDS_LIMIT",
+    "expected_decision": "CAP_TO_LIMIT",
+    "description": "Settlement 587315.13 > limit 411543.58",
+    "related_entity_id": "COV-POL-AUTO-2026-000678-002",
+    "severity": "HIGH"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000054",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000054",
+    "related_entity_id": "DOC-CLM-2026-000054-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000057",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000057",
+    "related_entity_id": "DOC-CLM-2026-000057-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000062",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000062",
+    "related_entity_id": "DOC-CLM-2026-000062-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000068",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000068",
+    "related_entity_id": "DOC-CLM-2026-000068-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000079",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000079",
+    "related_entity_id": "DOC-CLM-2026-000079-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000082",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000082",
+    "related_entity_id": "DOC-CLM-2026-000082-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000096",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000096",
+    "related_entity_id": "DOC-CLM-2026-000096-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000113",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000113",
+    "related_entity_id": "DOC-CLM-2026-000113-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000118",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000118",
+    "related_entity_id": "DOC-CLM-2026-000118-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "CLAIM",
+    "entity_id": "CLM-2026-000138",
+    "issue_type": "MISSING_MANDATORY_DOCUMENT",
+    "expected_decision": "REQUEST_DOCUMENTS",
+    "description": "Missing DRIVERS_LICENSE for claim CLM-2026-000138",
+    "related_entity_id": "DOC-CLM-2026-000138-004",
+    "severity": "MEDIUM"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000002-002",
+    "issue_type": "CLAIM_PAID_TWICE",
+    "expected_decision": "FLAG_DUPLICATE_PAYMENT",
+    "description": "Duplicate payment for claim CLM-2026-000002, original SET-CLM-2026-000002-001",
+    "related_entity_id": "SET-CLM-2026-000002-001",
+    "severity": "CRITICAL"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000003-002",
+    "issue_type": "CLAIM_PAID_TWICE",
+    "expected_decision": "FLAG_DUPLICATE_PAYMENT",
+    "description": "Duplicate payment for claim CLM-2026-000003, original SET-CLM-2026-000003-001",
+    "related_entity_id": "SET-CLM-2026-000003-001",
+    "severity": "CRITICAL"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000008-002",
+    "issue_type": "CLAIM_PAID_TWICE",
+    "expected_decision": "FLAG_DUPLICATE_PAYMENT",
+    "description": "Duplicate payment for claim CLM-2026-000008, original SET-CLM-2026-000008-001",
+    "related_entity_id": "SET-CLM-2026-000008-001",
+    "severity": "CRITICAL"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000014-002",
+    "issue_type": "CLAIM_PAID_TWICE",
+    "expected_decision": "FLAG_DUPLICATE_PAYMENT",
+    "description": "Duplicate payment for claim CLM-2026-000014, original SET-CLM-2026-000014-001",
+    "related_entity_id": "SET-CLM-2026-000014-001",
+    "severity": "CRITICAL"
+  },
+  {
+    "entity_type": "SETTLEMENT",
+    "entity_id": "SET-CLM-2026-000018-002",
+    "issue_type": "CLAIM_PAID_TWICE",
+    "expected_decision": "FLAG_DUPLICATE_PAYMENT",
+    "description": "Duplicate payment for claim CLM-2026-000018, original SET-CLM-2026-000018-001",
+    "related_entity_id": "SET-CLM-2026-000018-001",
+    "severity": "CRITICAL"
+  }
+]

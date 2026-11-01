@@ -1,0 +1,311 @@
+{
+  "generator": "generate.py",
+  "generator_version": "1.1.0",
+  "python_version": "3.12.14",
+  "seed": 20261022,
+  "scale": "full",
+  "generated_at": "2026-11-01T21:35:01.506805",
+  "checksum": "b86c8da328dd8396ff0d683d2f7049aa01a346c0e5523f5830f6f83d5b0fb467",
+  "tables": {
+    "customers": {
+      "row_count": 1500,
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "date_of_birth",
+        "email",
+        "phone",
+        "address_line1",
+        "city",
+        "state",
+        "zip_code",
+        "created_at",
+        "status"
+      ],
+      "csv": "csv/customers.csv",
+      "json": "json/customers.json",
+      "sql": "sql/customers.sql"
+    },
+    "adjusters": {
+      "row_count": 50,
+      "columns": [
+        "adjuster_id",
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "specializations",
+        "license_number",
+        "hire_date",
+        "status",
+        "max_concurrent_claims"
+      ],
+      "csv": "csv/adjusters.csv",
+      "json": "json/adjusters.json",
+      "sql": "sql/adjusters.sql"
+    },
+    "policies": {
+      "row_count": 2000,
+      "columns": [
+        "policy_id",
+        "customer_id",
+        "product_type",
+        "policy_number",
+        "effective_date",
+        "expiration_date",
+        "term_months",
+        "premium_amount",
+        "payment_frequency",
+        "status",
+        "cancellation_date",
+        "lapse_date",
+        "underwriting_status",
+        "created_at",
+        "updated_at"
+      ],
+      "csv": "csv/policies.csv",
+      "json": "json/policies.json",
+      "sql": "sql/policies.sql"
+    },
+    "coverages": {
+      "row_count": 6041,
+      "columns": [
+        "coverage_id",
+        "policy_id",
+        "coverage_type",
+        "coverage_limit",
+        "deductible",
+        "co_pay_percentage",
+        "exclusions",
+        "effective_date",
+        "expiration_date",
+        "status"
+      ],
+      "csv": "csv/coverages.csv",
+      "json": "json/coverages.json",
+      "sql": "sql/coverages.sql"
+    },
+    "incidents": {
+      "row_count": 1175,
+      "columns": [
+        "incident_id",
+        "incident_type",
+        "incident_date",
+        "incident_time",
+        "description",
+        "location_city",
+        "location_state",
+        "severity",
+        "police_report_filed",
+        "witnesses",
+        "product_category",
+        "reported_date"
+      ],
+      "csv": "csv/incidents.csv",
+      "json": "json/incidents.json",
+      "sql": "sql/incidents.sql"
+    },
+    "claims": {
+      "row_count": 1000,
+      "columns": [
+        "claim_id",
+        "policy_id",
+        "customer_id",
+        "incident_id",
+        "claim_type",
+        "claim_amount",
+        "submission_date",
+        "status",
+        "assigned_adjuster_id",
+        "priority",
+        "denial_reason",
+        "fraud_indicator",
+        "coverage_id",
+        "created_at",
+        "updated_at"
+      ],
+      "csv": "csv/claims.csv",
+      "json": "json/claims.json",
+      "sql": "sql/claims.sql"
+    },
+    "claim_items": {
+      "row_count": 3036,
+      "columns": [
+        "claim_item_id",
+        "claim_id",
+        "item_description",
+        "item_category",
+        "claimed_amount",
+        "approved_amount",
+        "quantity",
+        "unit_cost",
+        "status"
+      ],
+      "csv": "csv/claim_items.csv",
+      "json": "json/claim_items.json",
+      "sql": "sql/claim_items.sql"
+    },
+    "documents": {
+      "row_count": 3990,
+      "columns": [
+        "document_id",
+        "claim_id",
+        "document_type",
+        "file_name",
+        "file_size_kb",
+        "upload_date",
+        "uploaded_by",
+        "status",
+        "verification_date",
+        "notes"
+      ],
+      "csv": "csv/documents.csv",
+      "json": "json/documents.json",
+      "sql": "sql/documents.sql"
+    },
+    "assessments": {
+      "row_count": 951,
+      "columns": [
+        "assessment_id",
+        "claim_id",
+        "adjuster_id",
+        "assessment_date",
+        "assessed_amount",
+        "deductible_applied",
+        "eligible_amount",
+        "coverage_limit",
+        "coverage_verified",
+        "liability_percentage",
+        "recommendation",
+        "notes",
+        "fraud_score"
+      ],
+      "csv": "csv/assessments.csv",
+      "json": "json/assessments.json",
+      "sql": "sql/assessments.sql"
+    },
+    "reserves": {
+      "row_count": 420,
+      "columns": [
+        "reserve_id",
+        "claim_id",
+        "initial_reserve",
+        "current_reserve",
+        "reserve_type",
+        "set_date",
+        "last_updated",
+        "set_by",
+        "currency",
+        "status"
+      ],
+      "csv": "csv/reserves.csv",
+      "json": "json/reserves.json",
+      "sql": "sql/reserves.sql"
+    },
+    "settlements": {
+      "row_count": 246,
+      "columns": [
+        "settlement_id",
+        "claim_id",
+        "assessment_id",
+        "settlement_amount",
+        "payment_method",
+        "payment_date",
+        "approved_by",
+        "approved_date",
+        "status",
+        "payee_name",
+        "payee_customer_id",
+        "notes"
+      ],
+      "csv": "csv/settlements.csv",
+      "json": "json/settlements.json",
+      "sql": "sql/settlements.sql"
+    },
+    "claim_state_history": {
+      "row_count": 3195,
+      "columns": [
+        "event_id",
+        "claim_id",
+        "from_status",
+        "to_status",
+        "changed_by",
+        "change_reason",
+        "event_timestamp"
+      ],
+      "csv": "csv/claim_state_history.csv",
+      "json": "json/claim_state_history.json",
+      "sql": "sql/claim_state_history.sql"
+    }
+  },
+  "ground_truth": {
+    "row_count": 45,
+    "csv": "ground_truth.csv",
+    "json": "ground_truth.json"
+  },
+  "claims_input_features": {
+    "row_count": 1000,
+    "csv": "features/claims_input.csv",
+    "excluded_outcome_fields": [
+      "denial_reason",
+      "status"
+    ],
+    "columns": [
+      "claim_id",
+      "policy_id",
+      "customer_id",
+      "incident_id",
+      "claim_type",
+      "claim_amount",
+      "submission_date",
+      "assigned_adjuster_id",
+      "priority",
+      "fraud_indicator",
+      "coverage_id",
+      "created_at",
+      "updated_at"
+    ]
+  },
+  "file_sha256": {
+    "csv/adjusters.csv": "3e0d39d88ced397600264fb55fcbf4c47256812422e36687fb54799e094c239e",
+    "csv/assessments.csv": "42af214ec1d7140a3a96435159c496d0d17b23db1d61f15a87348aa1ac61946b",
+    "csv/claim_items.csv": "e052cdf61523726d4a3ee07189e4753cdc32a28ba7244e78d859eb5b2650d532",
+    "csv/claim_state_history.csv": "d036dd9f62d0a2a3b8021396d164557e2b40b808adfcb05aa6aba6a190599872",
+    "csv/claims.csv": "10c3e9d4f82539ba607e889f8abb8290c11b7384ae94fe7b0c87f3ba6a99c862",
+    "csv/coverages.csv": "d31a745c860b3be459656e2bf161753e5a7b060d93cba8997912dc6ddda99aa1",
+    "csv/customers.csv": "51b89eb37a2bad1aa6da9a1937daa7dce70393f10d090ada99067e8a086e0134",
+    "csv/documents.csv": "0bc9ca9e8a7f139100d967dbb9ccc02055bf3d6d90863bd71e7f76fa021d1e20",
+    "csv/incidents.csv": "106590c473f62a81f91845a6456e2db5c24bf2991a06cef905bca94d09ff67ca",
+    "csv/policies.csv": "09ab35e6e7c523eeb0328c1e144dc4977bb3199e4d6cdfb2247fbaa5746e19a3",
+    "csv/reserves.csv": "47d012a909eeacc1747caac21f34183c0e76080a60e2eb7b84293e015be718b9",
+    "csv/settlements.csv": "2db00850dfe61dfe2313aecb8c28184883ca9469a4391188eb3117a630fcac31",
+    "json/adjusters.json": "14fe6d347ad346d4a4664a545a5440dd2d8e6eedd1c2a0f2073f9f4613c39528",
+    "json/assessments.json": "5a1bd34648b5976d06ab1c6ce6f955194670007c0922de548a0825ae8634354d",
+    "json/claim_items.json": "03e35f967306e6dc26f12389b7d55b284b459ddeab6382cc0dbabfc021baa8fd",
+    "json/claim_state_history.json": "94afc073636a7123c99e81cf1538680e474e5667b147f9ad5c99c3592bfa918f",
+    "json/claims.json": "79f2e05f52689efec033fee387e9f2cc02bcb3f0c3db9820eda0eccca6685cb6",
+    "json/coverages.json": "f4b5dcd70ff76c63b23d5b48f224505141b227045e7a580c76941da18669607b",
+    "json/customers.json": "f90154780eeb8bf0b2c3df371ef2986de4288676ae0dcdd19e16021927fdea0b",
+    "json/documents.json": "2f20ce63276227468f43bbdbc183bbd4c2c7bf5a174f079075d090ee9cf68059",
+    "json/incidents.json": "f86aa04b49826f0bebd40a6110d7a12ffce4e4d521168b94efef5672405401e7",
+    "json/policies.json": "82916ea3d740812c051f55cafd79c5826fa774a1515e957138c86d0f6a44e693",
+    "json/reserves.json": "46c9fe52135789137b80c7869c8e996291cc7eeac21703662034d0fdc8c8f384",
+    "json/settlements.json": "42f9615df7befc0ad95cc0e53d16ebd34c87cf9428abbee16600c1b21404bc72",
+    "sql/adjusters.sql": "a81d4cc2dafa5fa689eba1b0bb998ee292b697fb79bf466d72508286a8d6174e",
+    "sql/assessments.sql": "49638d281500c01b93758139ef619607a269bf3d1326ff4f4bf544d97a46d289",
+    "sql/claim_items.sql": "d40f7b8c73a8ba4eb4831aeddfc2520821a0337b1605d3042a274b36fbb78e61",
+    "sql/claim_state_history.sql": "9ae778a4588dbe164a48ae0efb42a46c16fbb819883d72b08bf873e233440903",
+    "sql/claims.sql": "2885d7499a114da90c082a260d55ed58b9c325eaede57a071358366b41df4dfa",
+    "sql/coverages.sql": "0ecb1a04bdb8fd2ef92f2de80bf131d2a0c72510260982de7d6e6c9e032e6424",
+    "sql/customers.sql": "e6e8735b0ace4973640577add1299d3f95596b7ef1a829479b3ab7533bb5636b",
+    "sql/documents.sql": "96869b1c1660cde0929b1452f861fc38f42d6d59bbece54fbf02791831b9e195",
+    "sql/incidents.sql": "05d9485debc27b4d32a5870ab9462127eace4fdcec02041718a32ee5ebcac4b0",
+    "sql/policies.sql": "68cc3c0fd6856e2d6b70f7c7eb5ab42eab5e5fa6e5bf184a1f3c8c7925e59093",
+    "sql/reserves.sql": "36c7fe58c6ce286d26ffe82ae6f671667eea91510e9e3471b8dd60b2761adae5",
+    "sql/settlements.sql": "3d5f31a9aba881698bb31f6786cbb74ad1456a99c498ca13fa0858ff9762d83d",
+    "features/claims_input.csv": "c12487020e16cb39ccb55476d98fe5b2690f6698bed34a4464b5221ebe6af0bc",
+    "ground_truth.csv": "d47181ddfed6832400a95f76437138a0c0e61bb2d7705f39b4f0392ced8d1601",
+    "ground_truth.json": "f4ff412e17878e2a201bdee58c7c4833551b5a375e1b46c3feda1f43257b391a"
+  }
+}

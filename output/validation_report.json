@@ -1,0 +1,463 @@
+{
+  "overall": "PASS",
+  "pass": 89,
+  "fail": 0,
+  "warn": 2,
+  "checks": [
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_CUSTOMERS",
+      "detail": "1500 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_ADJUSTERS",
+      "detail": "50 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_POLICIES",
+      "detail": "2000 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_COVERAGES",
+      "detail": "6041 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_INCIDENTS",
+      "detail": "1175 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_CLAIMS",
+      "detail": "1000 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_CLAIM_ITEMS",
+      "detail": "3036 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_DOCUMENTS",
+      "detail": "3990 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_ASSESSMENTS",
+      "detail": "951 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_RESERVES",
+      "detail": "420 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_SETTLEMENTS",
+      "detail": "246 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_CLAIM_STATE_HISTORY",
+      "detail": "3195 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_POLICIES.CUSTOMER_ID",
+      "detail": "All references valid -> customers"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_COVERAGES.POLICY_ID",
+      "detail": "All references valid -> policies"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIMS.POLICY_ID",
+      "detail": "All references valid -> policies"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIMS.CUSTOMER_ID",
+      "detail": "All references valid -> customers"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIMS.INCIDENT_ID",
+      "detail": "All references valid -> incidents"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIMS.ASSIGNED_ADJUSTER_ID",
+      "detail": "All references valid -> adjusters"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIMS.COVERAGE_ID",
+      "detail": "All references valid -> coverages"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIM_ITEMS.CLAIM_ID",
+      "detail": "All references valid -> claims"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_DOCUMENTS.CLAIM_ID",
+      "detail": "All references valid -> claims"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_DOCUMENTS.UPLOADED_BY",
+      "detail": "All references valid -> customers"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_ASSESSMENTS.CLAIM_ID",
+      "detail": "All references valid -> claims"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_ASSESSMENTS.ADJUSTER_ID",
+      "detail": "All references valid -> adjusters"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_RESERVES.CLAIM_ID",
+      "detail": "All references valid -> claims"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_RESERVES.SET_BY",
+      "detail": "All references valid -> adjusters"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_SETTLEMENTS.CLAIM_ID",
+      "detail": "All references valid -> claims"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_SETTLEMENTS.ASSESSMENT_ID",
+      "detail": "All references valid -> assessments"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_SETTLEMENTS.APPROVED_BY",
+      "detail": "All references valid -> adjusters"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_SETTLEMENTS.PAYEE_CUSTOMER_ID",
+      "detail": "All references valid -> customers"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIM_STATE_HISTORY.CLAIM_ID",
+      "detail": "All references valid -> claims"
+    },
+    {
+      "status": "PASS",
+      "rule": "JOIN_CLAIM_MASTER_CONSISTENCY",
+      "detail": "claim customer/product, incident product, and item type must agree"
+    },
+    {
+      "status": "PASS",
+      "rule": "JOIN_COVERAGE_POLICY_CONSISTENCY",
+      "detail": "claim coverage and policy coverage dates must agree"
+    },
+    {
+      "status": "PASS",
+      "rule": "JOIN_ACTIVE_SPECIALIST_ADJUSTER",
+      "detail": "assigned adjuster must be active and specialized"
+    },
+    {
+      "status": "PASS",
+      "rule": "JOIN_ASSESSMENT_ADJUSTER",
+      "detail": "assessment adjuster must match claim assignment"
+    },
+    {
+      "status": "PASS",
+      "rule": "JOIN_SETTLEMENT_ASSESSMENT",
+      "detail": "settlement assessment must belong to the same claim"
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_POLICIES.STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_POLICIES.PRODUCT_TYPE",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_POLICIES.PAYMENT_FREQUENCY",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_POLICIES.UNDERWRITING_STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_CLAIMS.STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_CLAIMS.CLAIM_TYPE",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_CLAIMS.PRIORITY",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_INCIDENTS.SEVERITY",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_DOCUMENTS.STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_ASSESSMENTS.RECOMMENDATION",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_RESERVES.STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_RESERVES.RESERVE_TYPE",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_SETTLEMENTS.STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_SETTLEMENTS.PAYMENT_METHOD",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_ADJUSTERS.STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_CUSTOMERS.STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_COVERAGES.STATUS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "DATE_POLICY_EFF_LT_EXP",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "DATE_COVERAGE_MATCHES_POLICY",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "DATE_CLAIM_AFTER_INCIDENT_REPORT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "DATE_SETTLEMENT_APPROVED_BEFORE_PAYMENT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_ITEM_COST_CONSISTENCY",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_ELIGIBLE_LE_LIMIT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_ELIGIBLE_FORMULA",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_RESERVE_RANGE",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_SETTLEMENT_LIMIT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_SETTLEMENT_ASSESSMENT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "LIFECYCLE_VALID_TRANSITIONS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "LIFECYCLE_DENIED_HAS_REASON",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "LIFECYCLE_FINAL_STATE_MATCH",
+      "detail": ""
+    },
+    {
+      "status": "WARN",
+      "rule": "DUP_INCIDENTS",
+      "detail": "5 potential duplicate incidents across 5 groups"
+    },
+    {
+      "status": "WARN",
+      "rule": "DUP_SETTLEMENTS_PER_CLAIM",
+      "detail": "5 claims with multiple settlements (may be edge cases)"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_EXISTS",
+      "detail": "45 anomaly labels"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_COVERAGE",
+      "detail": "All 6 required edge-case types present"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_COUNT_CLAIM_DATE_BEFORE_POLICY_START",
+      "detail": "10 cases"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_COUNT_CLAIM_PAID_TWICE",
+      "detail": "5 cases"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_COUNT_DUPLICATE_INCIDENT",
+      "detail": "5 cases"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_COUNT_MISSING_MANDATORY_DOCUMENT",
+      "detail": "10 cases"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_COUNT_POLICY_CANCELLED_BEFORE_INCIDENT",
+      "detail": "10 cases"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_COUNT_SETTLEMENT_EXCEEDS_LIMIT",
+      "detail": "5 cases"
+    },
+    {
+      "status": "PASS",
+      "rule": "GROUND_TRUTH_ENTITY_EXISTS",
+      "detail": "All ground-truth entities exist in data"
+    },
+    {
+      "status": "PASS",
+      "rule": "REQUIRED_DOCUMENT_ROWS",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "EDGE_SEMANTICS_CLAIM_DATE_BEFORE_POLICY_START",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "EDGE_SEMANTICS_CLAIM_PAID_TWICE",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "EDGE_SEMANTICS_DUPLICATE_INCIDENT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "EDGE_SEMANTICS_MISSING_MANDATORY_DOCUMENT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "EDGE_SEMANTICS_POLICY_CANCELLED_BEFORE_INCIDENT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "EDGE_SEMANTICS_SETTLEMENT_EXCEEDS_LIMIT",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "FEATURE_OUTCOME_SEPARATION",
+      "detail": ""
+    },
+    {
+      "status": "PASS",
+      "rule": "FEATURE_VIEW_ROW_COUNT",
+      "detail": "1000 rows"
+    },
+    {
+      "status": "PASS",
+      "rule": "VOLUME_CUSTOMERS",
+      "detail": "1500 rows"
+    },
+    {
+      "status": "PASS",
+      "rule": "VOLUME_POLICIES",
+      "detail": "2000 rows"
+    },
+    {
+      "status": "PASS",
+      "rule": "VOLUME_CLAIMS",
+      "detail": "1000 rows"
+    },
+    {
+      "status": "PASS",
+      "rule": "VOLUME_ADJUSTERS",
+      "detail": "50 rows"
+    },
+    {
+      "status": "PASS",
+      "rule": "VOLUME_CLAIM_TYPE_DISTRIBUTION",
+      "detail": "5 types: {'AUTO': 300, 'HOME': 200, 'HEALTH': 250, 'LIFE': 100, 'TRAVEL': 150}"
+    }
+  ]
+}

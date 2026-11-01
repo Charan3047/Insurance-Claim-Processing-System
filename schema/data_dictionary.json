@@ -1,0 +1,270 @@
+{
+  "schema_version": "1.0",
+  "description": "Insurance Claims Processing Data Model",
+  "seed": 20261022,
+  "entities": {
+    "customer": {
+      "table_name": "customers",
+      "primary_key": "customer_id",
+      "id_pattern": "CUST-NNNNNN",
+      "fields": {
+        "customer_id":   {"type": "VARCHAR(15)",  "required": true,  "unique": true},
+        "first_name":    {"type": "VARCHAR(50)",  "required": true,  "unique": false},
+        "last_name":     {"type": "VARCHAR(50)",  "required": true,  "unique": false},
+        "date_of_birth": {"type": "DATE",         "required": true,  "unique": false, "validation": "1950-01-01..2000-12-31"},
+        "email":         {"type": "VARCHAR(100)", "required": true,  "unique": false},
+        "phone":         {"type": "VARCHAR(20)",  "required": true,  "unique": false},
+        "address_line1": {"type": "VARCHAR(200)", "required": true,  "unique": false},
+        "city":          {"type": "VARCHAR(50)",  "required": true,  "unique": false},
+        "state":         {"type": "CHAR(2)",      "required": true,  "unique": false, "allowed_values": ["CA","TX","FL","NY","PA","IL","OH","GA","NC","MI","NJ","VA","WA","AZ","MA","TN","IN","MO","MD","WI"]},
+        "zip_code":      {"type": "CHAR(5)",      "required": true,  "unique": false},
+        "created_at":    {"type": "TIMESTAMP",    "required": true,  "unique": false},
+        "status":        {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["ACTIVE","INACTIVE"]}
+      }
+    },
+    "policy": {
+      "table_name": "policies",
+      "primary_key": "policy_id",
+      "id_pattern": "POL-<PRODUCT>-2026-NNNNNN",
+      "foreign_keys": {"customer_id": "customers.customer_id"},
+      "fields": {
+        "policy_id":           {"type": "VARCHAR(30)", "required": true,  "unique": true},
+        "customer_id":         {"type": "VARCHAR(15)", "required": true,  "unique": false},
+        "product_type":        {"type": "VARCHAR(10)", "required": true,  "unique": false, "allowed_values": ["AUTO","HOME","HEALTH","LIFE","TRAVEL"]},
+        "policy_number":       {"type": "VARCHAR(30)", "required": true,  "unique": true},
+        "effective_date":      {"type": "DATE",        "required": true,  "unique": false},
+        "expiration_date":     {"type": "DATE",        "required": true,  "unique": false},
+        "term_months":         {"type": "INT",         "required": true,  "unique": false, "allowed_values": [6,12,24,36]},
+        "premium_amount":      {"type": "DECIMAL(12,2)","required": true, "unique": false, "validation": "> 0"},
+        "payment_frequency":   {"type": "VARCHAR(15)", "required": true,  "unique": false, "allowed_values": ["MONTHLY","QUARTERLY","SEMI_ANNUAL","ANNUAL"]},
+        "status":              {"type": "VARCHAR(12)", "required": true,  "unique": false, "allowed_values": ["ACTIVE","EXPIRED","CANCELLED","LAPSED"]},
+        "cancellation_date":   {"type": "DATE",        "required": false, "unique": false},
+        "lapse_date":          {"type": "DATE",        "required": false, "unique": false},
+        "underwriting_status": {"type": "VARCHAR(15)", "required": true,  "unique": false, "allowed_values": ["APPROVED","CONDITIONAL","DECLINED"]},
+        "created_at":          {"type": "TIMESTAMP",   "required": true,  "unique": false},
+        "updated_at":          {"type": "TIMESTAMP",   "required": true,  "unique": false}
+      }
+    },
+    "coverage": {
+      "table_name": "coverages",
+      "primary_key": "coverage_id",
+      "id_pattern": "COV-<policy_id>-NNN",
+      "foreign_keys": {"policy_id": "policies.policy_id"},
+      "fields": {
+        "coverage_id":      {"type": "VARCHAR(40)", "required": true,  "unique": true},
+        "policy_id":        {"type": "VARCHAR(30)", "required": true,  "unique": false},
+        "coverage_type":    {"type": "VARCHAR(30)", "required": true,  "unique": false},
+        "coverage_limit":   {"type": "DECIMAL(12,2)","required": true, "unique": false},
+        "deductible":       {"type": "DECIMAL(12,2)","required": true, "unique": false},
+        "co_pay_percentage":{"type": "INT",         "required": true,  "unique": false},
+        "exclusions":       {"type": "TEXT",        "required": false, "unique": false},
+        "effective_date":   {"type": "DATE",        "required": true,  "unique": false},
+        "expiration_date":  {"type": "DATE",        "required": true,  "unique": false},
+        "status":           {"type": "VARCHAR(10)", "required": true,  "unique": false, "allowed_values": ["ACTIVE","INACTIVE"]}
+      }
+    },
+    "incident": {
+      "table_name": "incidents",
+      "primary_key": "incident_id",
+      "id_pattern": "INC-2026-NNNNNN",
+      "fields": {
+        "incident_id":        {"type": "VARCHAR(20)", "required": true,  "unique": true},
+        "incident_type":      {"type": "VARCHAR(35)", "required": true,  "unique": false},
+        "incident_date":      {"type": "DATE",        "required": true,  "unique": false},
+        "incident_time":      {"type": "TIME",        "required": true,  "unique": false},
+        "description":        {"type": "TEXT",        "required": true,  "unique": false},
+        "location_city":      {"type": "VARCHAR(50)", "required": true,  "unique": false},
+        "location_state":     {"type": "CHAR(2)",     "required": true,  "unique": false},
+        "severity":           {"type": "VARCHAR(10)", "required": true,  "unique": false, "allowed_values": ["LOW","MEDIUM","HIGH","CRITICAL"]},
+        "police_report_filed":{"type": "BOOLEAN",     "required": true,  "unique": false},
+        "witnesses":          {"type": "INT",         "required": true,  "unique": false},
+        "product_category":   {"type": "VARCHAR(10)", "required": true,  "unique": false},
+        "reported_date":      {"type": "DATE",        "required": true,  "unique": false}
+      }
+    },
+    "claim": {
+      "table_name": "claims",
+      "primary_key": "claim_id",
+      "id_pattern": "CLM-2026-NNNNNN",
+      "foreign_keys": {
+        "policy_id": "policies.policy_id",
+        "customer_id": "customers.customer_id",
+        "incident_id": "incidents.incident_id",
+        "assigned_adjuster_id": "adjusters.adjuster_id",
+        "coverage_id": "coverages.coverage_id"
+      },
+      "fields": {
+        "claim_id":              {"type": "VARCHAR(20)",  "required": true,  "unique": true},
+        "policy_id":             {"type": "VARCHAR(30)",  "required": true,  "unique": false},
+        "customer_id":           {"type": "VARCHAR(15)",  "required": true,  "unique": false},
+        "incident_id":           {"type": "VARCHAR(20)",  "required": true,  "unique": false},
+        "claim_type":            {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["AUTO","HOME","HEALTH","LIFE","TRAVEL"]},
+        "claim_amount":          {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "submission_date":       {"type": "DATE",         "required": true,  "unique": false},
+        "status":                {"type": "VARCHAR(20)",  "required": true,  "unique": false, "allowed_values": ["SUBMITTED","UNDER_REVIEW","PENDING_DOCUMENTS","APPROVED","DENIED","SETTLED","CLOSED"]},
+        "assigned_adjuster_id":  {"type": "VARCHAR(15)",  "required": true,  "unique": false},
+        "priority":              {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["LOW","MEDIUM","HIGH","URGENT"]},
+        "denial_reason":         {"type": "VARCHAR(50)",  "required": false, "unique": false},
+        "fraud_indicator":       {"type": "BOOLEAN",      "required": true,  "unique": false},
+        "coverage_id":           {"type": "VARCHAR(40)",  "required": false, "unique": false},
+        "created_at":            {"type": "TIMESTAMP",    "required": true,  "unique": false},
+        "updated_at":            {"type": "TIMESTAMP",    "required": true,  "unique": false}
+      }
+    },
+    "claim_item": {
+      "table_name": "claim_items",
+      "primary_key": "claim_item_id",
+      "id_pattern": "CLI-<claim_id>-NNN",
+      "foreign_keys": {"claim_id": "claims.claim_id"},
+      "fields": {
+        "claim_item_id":  {"type": "VARCHAR(30)",  "required": true,  "unique": true},
+        "claim_id":       {"type": "VARCHAR(20)",  "required": true,  "unique": false},
+        "item_description":{"type": "TEXT",        "required": true,  "unique": false},
+        "item_category":  {"type": "VARCHAR(10)",  "required": true,  "unique": false},
+        "claimed_amount": {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "approved_amount":{"type": "DECIMAL(12,2)","required": false, "unique": false},
+        "quantity":       {"type": "INT",          "required": true,  "unique": false},
+        "unit_cost":      {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "status":         {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["PENDING","APPROVED","DENIED"]}
+      }
+    },
+    "document": {
+      "table_name": "documents",
+      "primary_key": "document_id",
+      "id_pattern": "DOC-<claim_id>-NNN",
+      "foreign_keys": {"claim_id": "claims.claim_id"},
+      "fields": {
+        "document_id":      {"type": "VARCHAR(30)",  "required": true,  "unique": true},
+        "claim_id":         {"type": "VARCHAR(20)",  "required": true,  "unique": false},
+        "document_type":    {"type": "VARCHAR(30)",  "required": true,  "unique": false},
+        "file_name":        {"type": "VARCHAR(100)", "required": true,  "unique": false},
+        "file_size_kb":     {"type": "INT",          "required": true,  "unique": false},
+        "upload_date":      {"type": "DATE",         "required": true,  "unique": false},
+        "uploaded_by":      {"type": "VARCHAR(15)",  "required": true,  "unique": false},
+        "status":           {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["RECEIVED","VERIFIED","REJECTED"]},
+        "verification_date":{"type": "DATE",         "required": false, "unique": false},
+        "notes":            {"type": "TEXT",         "required": false, "unique": false}
+      }
+    },
+    "adjuster": {
+      "table_name": "adjusters",
+      "primary_key": "adjuster_id",
+      "id_pattern": "ADJ-NNNNNN",
+      "fields": {
+        "adjuster_id":         {"type": "VARCHAR(15)", "required": true,  "unique": true},
+        "first_name":          {"type": "VARCHAR(50)", "required": true,  "unique": false},
+        "last_name":           {"type": "VARCHAR(50)", "required": true,  "unique": false},
+        "email":               {"type": "VARCHAR(100)","required": true,  "unique": false},
+        "phone":               {"type": "VARCHAR(20)", "required": true,  "unique": false},
+        "specializations":     {"type": "TEXT",        "required": true,  "unique": false},
+        "license_number":      {"type": "VARCHAR(20)", "required": true,  "unique": true},
+        "hire_date":           {"type": "DATE",        "required": true,  "unique": false},
+        "status":              {"type": "VARCHAR(10)", "required": true,  "unique": false, "allowed_values": ["ACTIVE","ON_LEAVE","INACTIVE"]},
+        "max_concurrent_claims":{"type": "INT",        "required": true,  "unique": false}
+      }
+    },
+    "assessment": {
+      "table_name": "assessments",
+      "primary_key": "assessment_id",
+      "id_pattern": "ASN-<claim_id>-NNN",
+      "foreign_keys": {"claim_id": "claims.claim_id", "adjuster_id": "adjusters.adjuster_id"},
+      "fields": {
+        "assessment_id":       {"type": "VARCHAR(30)",  "required": true,  "unique": true},
+        "claim_id":            {"type": "VARCHAR(20)",  "required": true,  "unique": false},
+        "adjuster_id":         {"type": "VARCHAR(15)",  "required": true,  "unique": false},
+        "assessment_date":     {"type": "DATE",         "required": true,  "unique": false},
+        "assessed_amount":     {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "deductible_applied":  {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "eligible_amount":     {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "coverage_limit":      {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "coverage_verified":   {"type": "BOOLEAN",      "required": true,  "unique": false},
+        "liability_percentage":{"type": "INT",          "required": true,  "unique": false},
+        "recommendation":      {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["APPROVE","DENY","REVIEW"]},
+        "notes":               {"type": "TEXT",         "required": false, "unique": false},
+        "fraud_score":         {"type": "DECIMAL(5,3)", "required": true,  "unique": false}
+      }
+    },
+    "reserve": {
+      "table_name": "reserves",
+      "primary_key": "reserve_id",
+      "id_pattern": "RSV-<claim_id>-NNN",
+      "foreign_keys": {"claim_id": "claims.claim_id"},
+      "fields": {
+        "reserve_id":       {"type": "VARCHAR(30)",  "required": true,  "unique": true},
+        "claim_id":         {"type": "VARCHAR(20)",  "required": true,  "unique": false},
+        "initial_reserve":  {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "current_reserve":  {"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "reserve_type":     {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["CASE"]},
+        "set_date":         {"type": "DATE",         "required": true,  "unique": false},
+        "last_updated":     {"type": "DATE",         "required": true,  "unique": false},
+        "set_by":           {"type": "VARCHAR(15)",  "required": true,  "unique": false},
+        "currency":         {"type": "CHAR(3)",      "required": true,  "unique": false, "allowed_values": ["USD"]},
+        "status":           {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["OPEN","CLOSED"]}
+      }
+    },
+    "settlement": {
+      "table_name": "settlements",
+      "primary_key": "settlement_id",
+      "id_pattern": "SET-<claim_id>-NNN",
+      "foreign_keys": {"claim_id": "claims.claim_id"},
+      "fields": {
+        "settlement_id":    {"type": "VARCHAR(30)",  "required": true,  "unique": true},
+        "claim_id":         {"type": "VARCHAR(20)",  "required": true,  "unique": false},
+        "assessment_id":    {"type": "VARCHAR(30)",  "required": false, "unique": false},
+        "settlement_amount":{"type": "DECIMAL(12,2)","required": true,  "unique": false},
+        "payment_method":   {"type": "VARCHAR(20)",  "required": true,  "unique": false, "allowed_values": ["CHECK","ACH","WIRE_TRANSFER","DIRECT_DEPOSIT"]},
+        "payment_date":     {"type": "DATE",         "required": true,  "unique": false},
+        "approved_by":      {"type": "VARCHAR(15)",  "required": true,  "unique": false},
+        "approved_date":    {"type": "DATE",         "required": true,  "unique": false},
+        "status":           {"type": "VARCHAR(10)",  "required": true,  "unique": false, "allowed_values": ["PENDING","APPROVED","PAID","REJECTED"]},
+        "payee_name":       {"type": "VARCHAR(100)", "required": true,  "unique": false},
+        "payee_customer_id":{"type": "VARCHAR(15)",  "required": true,  "unique": false},
+        "notes":            {"type": "TEXT",         "required": false, "unique": false}
+      }
+    },
+    "claim_state_history": {
+      "table_name": "claim_state_history",
+      "primary_key": "event_id",
+      "id_pattern": "EVT-<claim_id>-NNN",
+      "foreign_keys": {"claim_id": "claims.claim_id"},
+      "fields": {
+        "event_id":         {"type": "VARCHAR(30)", "required": true,  "unique": true},
+        "claim_id":         {"type": "VARCHAR(20)", "required": true,  "unique": false},
+        "from_status":      {"type": "VARCHAR(20)", "required": false, "unique": false},
+        "to_status":        {"type": "VARCHAR(20)", "required": true,  "unique": false},
+        "changed_by":       {"type": "VARCHAR(15)", "required": true,  "unique": false},
+        "change_reason":    {"type": "TEXT",        "required": true,  "unique": false},
+        "event_timestamp":  {"type": "TIMESTAMP",   "required": true,  "unique": false}
+      }
+    }
+  },
+  "relationships": [
+    {"parent": "customers",  "child": "policies",          "fk": "customer_id",         "cardinality": "1:N"},
+    {"parent": "policies",   "child": "coverages",         "fk": "policy_id",           "cardinality": "1:N"},
+    {"parent": "policies",   "child": "claims",            "fk": "policy_id",           "cardinality": "1:N"},
+    {"parent": "customers",  "child": "claims",            "fk": "customer_id",         "cardinality": "1:N"},
+    {"parent": "incidents",  "child": "claims",            "fk": "incident_id",         "cardinality": "1:N"},
+    {"parent": "adjusters",  "child": "claims",            "fk": "assigned_adjuster_id","cardinality": "1:N"},
+    {"parent": "coverages",  "child": "claims",            "fk": "coverage_id",         "cardinality": "1:N", "optional": true},
+    {"parent": "claims",     "child": "claim_items",       "fk": "claim_id",            "cardinality": "1:N"},
+    {"parent": "claims",     "child": "documents",         "fk": "claim_id",            "cardinality": "1:N"},
+    {"parent": "customers",  "child": "documents",         "fk": "uploaded_by",        "cardinality": "1:N"},
+    {"parent": "claims",     "child": "assessments",       "fk": "claim_id",            "cardinality": "1:1"},
+    {"parent": "adjusters",  "child": "assessments",       "fk": "adjuster_id",         "cardinality": "1:N"},
+    {"parent": "claims",     "child": "reserves",          "fk": "claim_id",            "cardinality": "1:1"},
+    {"parent": "adjusters",  "child": "reserves",          "fk": "set_by",              "cardinality": "1:N"},
+    {"parent": "claims",     "child": "settlements",       "fk": "claim_id",            "cardinality": "1:N"},
+    {"parent": "assessments","child": "settlements",       "fk": "assessment_id",       "cardinality": "1:N", "optional": true},
+    {"parent": "adjusters",  "child": "settlements",       "fk": "approved_by",         "cardinality": "1:N"},
+    {"parent": "customers",  "child": "settlements",       "fk": "payee_customer_id",   "cardinality": "1:N", "optional": true},
+    {"parent": "claims",     "child": "claim_state_history","fk": "claim_id",           "cardinality": "1:N"}
+  ],
+  "edge_case_types": [
+    "CLAIM_DATE_BEFORE_POLICY_START",
+    "POLICY_CANCELLED_BEFORE_INCIDENT",
+    "DUPLICATE_INCIDENT",
+    "SETTLEMENT_EXCEEDS_LIMIT",
+    "MISSING_MANDATORY_DOCUMENT",
+    "CLAIM_PAID_TWICE"
+  ]
+}

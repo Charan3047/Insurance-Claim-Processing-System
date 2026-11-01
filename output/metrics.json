@@ -1,0 +1,40 @@
+{
+  "dataset": {
+    "claims": 1000,
+    "policies": 2000,
+    "claim_types": {
+      "AUTO": 300,
+      "HEALTH": 250,
+      "HOME": 200,
+      "LIFE": 100,
+      "TRAVEL": 150
+    }
+  },
+  "claim_outcomes": {
+    "APPROVED": 87,
+    "CLOSED": 101,
+    "DENIED": 551,
+    "PENDING_DOCUMENTS": 10,
+    "SETTLED": 140,
+    "SUBMITTED": 47,
+    "UNDER_REVIEW": 64
+  },
+  "approval_rate": 0.328,
+  "coverage_failure_rate": 0.541,
+  "required_document_completeness_rate": 0.676,
+  "reserve_within_80_120_percent_rate": 1.0,
+  "settlement_within_coverage_limit_rate_excluding_labelled_over_limit_cases": 1.0,
+  "mean_days_submission_to_payment": 53.76,
+  "known_edge_case_counts": {
+    "CLAIM_DATE_BEFORE_POLICY_START": 10,
+    "CLAIM_PAID_TWICE": 5,
+    "DUPLICATE_INCIDENT": 5,
+    "MISSING_MANDATORY_DOCUMENT": 10,
+    "POLICY_CANCELLED_BEFORE_INCIDENT": 10,
+    "SETTLEMENT_EXCEEDS_LIMIT": 5
+  },
+  "notes": [
+    "Metrics are descriptive of this synthetic dataset, not estimates of real insurer performance.",
+    "Intentional SETTLEMENT_EXCEEDS_LIMIT labels are excluded from normal settlement-limit compliance."
+  ]
+}
