@@ -1,20 +1,37 @@
 #!/usr/bin/env python3
 """
-Insurance Claims Processing — Synthetic Data Generator
-=======================================================
-Generates a complete insurance-claims dataset with:
-  • 2,000 policies across 5 product types (AUTO, HOME, HEALTH, LIFE, TRAVEL)
-  • 1,000 claims with full lifecycle
-  • Edge cases and anomalies with separate ground-truth labels
-  • Reproducible via fixed seed (20261022)
+Insurance Claims Processing — Advanced Deterministic Synthetic Data Generator (v2.0)
+====================================================================================
+Generates a complete, strictly reconciled insurance-claims dataset with:
+  • 11 Core Entities: Customer, Adjuster, Policy, Coverage, Incident, Claim,
+    ClaimItem, Document, Assessment, Reserve, Settlement
+  • 2 Normalized N:M Bridge Tables:
+      - claim_adjuster_assignments (Claim <-> Adjuster many-to-many with roles)
+      - claim_coverage_allocations (Claim <-> Coverage many-to-many allocations)
+  • 1 Immutable Audit / Lifecycle Event Log:
+      - claim_state_history (append-only state transitions & actors)
+  • 2,000 policies and 1,000 claims across 5 product types (AUTO, HOME, HEALTH, LIFE, TRAVEL)
+  • 100% Bottom-Up Derived Arithmetic:
+      - ClaimItem: claimed_amount = round(quantity * unit_cost, 2)
+      - Claim: claim_amount = round(sum(item.claimed_amount), 2)
+      - Assessment: assessed_amount = round(sum(item.approved_amount), 2)
+      - Assessment: eligible_amount = 0.0 if denied else min(round(max(0, assessed_amount * (liability_pct/100) - deductible) * (1 - copay_pct/100), 2), coverage_limit)
+      - Settlement: settlement_amount = assessment.eligible_amount (except labelled over-limit edge cases)
+  • Clean Baseline + Explicitly Labelled Edge Cases & Fraud Scenarios:
+      - Zero unlabelled accidental anomalies in baseline records
+      - All 6 required edge-case classes + 4 extended portfolio exception classes
+      - Separate ground_truth.csv, ground_truth.json, and ground_truth_decisions.csv
+      - Strict zero-leakage feature projection in output/features/claims_input.csv
 
 Usage
 -----
-    python generate.py                        # full-scale, seed 20261022
-    python generate.py --scale starter        # small-scale (200 policies / 100 claims)
-    python generate.py --verify               # reproducibility check (two runs)
-    python generate.py --seed 42 --output out # custom seed & output dir
+    python generate.py                        # full-scale (2,000 policies / 1,000 claims), seed 20261022
+    python generate.py --scale starter        # starter-scale (200 policies / 100 claims)
+    python generate.py --verify               # two-run deterministic SHA-256 reproducibility check
+    python generate.py --seed 42 --output out # custom seed & output directory
 """
+
+from __future__ import annotations
 
 import argparse
 import csv
@@ -29,17 +46,18 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CONFIGURATION
+# CONFIGURATION & DOMAIN CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 DEFAULT_SEED = 20261022
+GENERATOR_VERSION = "2.0.0"
 
 SCALE_CONFIGS = {
     "starter": {
         "num_customers": 150,
         "num_policies": 200,
         "num_claims": 100,
-        "num_adjusters": 10,
+        "num_adjusters": 12,
     },
     "full": {
         "num_customers": 1500,
@@ -51,10 +69,15 @@ SCALE_CONFIGS = {
 
 PRODUCTS = ["AUTO", "HOME", "HEALTH", "LIFE", "TRAVEL"]
 
-POLICY_START_RANGE = (datetime(2024, 1, 1), datetime(2026, 6, 30))
-CLAIM_DATE_RANGE = (datetime(2025, 1, 1), datetime(2026, 10, 31))
+POLICY_START_RANGE = (datetime(2024, 1, 1), datetime(2026, 3, 31))
+CLAIM_DATE_RANGE = (datetime(2025, 1, 1), datetime(2026, 10, 15))
 
-POLICY_STATE_WEIGHTS = {"ACTIVE": 0.60, "EXPIRED": 0.20, "CANCELLED": 0.10, "LAPSED": 0.10}
+POLICY_STATE_WEIGHTS = {
+    "ACTIVE": 0.65,
+    "EXPIRED": 0.15,
+    "CANCELLED": 0.10,
+    "LAPSED": 0.10,
+}
 
 COVERAGE_CONFIG = {
     "AUTO": {
@@ -65,8 +88,8 @@ COVERAGE_CONFIG = {
             "UNINSURED_MOTORIST",
             "MEDICAL_PAYMENTS",
         ],
-        "limit_range": (25_000, 500_000),
-        "deductible_range": (250, 2_500),
+        "limit_range": (25_000, 250_000),
+        "deductible_range": (250, 2_000),
         "exclusions": ["RACING", "COMMERCIAL_USE", "INTENTIONAL_DAMAGE", "DUI"],
         "required_docs": ["POLICE_REPORT", "PHOTOS", "REPAIR_ESTIMATE", "DRIVERS_LICENSE"],
     },
@@ -77,21 +100,21 @@ COVERAGE_CONFIG = {
             "LIABILITY",
             "ADDITIONAL_LIVING_EXPENSE",
         ],
-        "limit_range": (50_000, 1_000_000),
+        "limit_range": (50_000, 750_000),
         "deductible_range": (500, 5_000),
         "exclusions": ["FLOOD", "EARTHQUAKE", "INTENTIONAL_DAMAGE", "NORMAL_WEAR"],
         "required_docs": ["PHOTOS", "INVENTORY_LIST", "REPAIR_ESTIMATE", "POLICE_REPORT"],
     },
     "HEALTH": {
         "types": ["HOSPITALIZATION", "OUTPATIENT", "PRESCRIPTION", "DENTAL", "VISION"],
-        "limit_range": (10_000, 2_000_000),
-        "deductible_range": (500, 10_000),
+        "limit_range": (15_000, 500_000),
+        "deductible_range": (250, 5_000),
         "exclusions": ["COSMETIC", "EXPERIMENTAL", "PRE_EXISTING_UNCOVERED"],
         "required_docs": ["MEDICAL_RECORDS", "BILLS", "REFERRAL", "ID_PROOF"],
     },
     "LIFE": {
         "types": ["TERM_DEATH", "ACCIDENTAL_DEATH", "DISABILITY", "CRITICAL_ILLNESS"],
-        "limit_range": (50_000, 5_000_000),
+        "limit_range": (50_000, 1_500_000),
         "deductible_range": (0, 0),
         "exclusions": ["SUICIDE_WITHIN_2YR", "FRAUD", "WAR", "ILLEGAL_ACTIVITY"],
         "required_docs": [
@@ -103,7 +126,7 @@ COVERAGE_CONFIG = {
     },
     "TRAVEL": {
         "types": ["TRIP_CANCELLATION", "MEDICAL_ABROAD", "BAGGAGE_LOSS", "FLIGHT_DELAY"],
-        "limit_range": (1_000, 100_000),
+        "limit_range": (2_000, 50_000),
         "deductible_range": (50, 500),
         "exclusions": [
             "PRE_EXISTING_CONDITION",
@@ -139,10 +162,48 @@ INCIDENT_TYPES = {
     ],
 }
 
+ITEM_DESCRIPTIONS = {
+    "AUTO": [
+        "Vehicle body panel repair",
+        "Windshield & glass replacement",
+        "Emergency towing & recovery",
+        "Substitute rental car allowance",
+        "Bumper & frame recalibration",
+    ],
+    "HOME": [
+        "Roof shingle & structural repair",
+        "Water extraction & dehumidification",
+        "Damaged appliance & furniture replacement",
+        "Electrical panel & wiring restoration",
+        "Emergency board-up & debris removal",
+    ],
+    "HEALTH": [
+        "Inpatient hospital room & board",
+        "Surgical procedure & anesthesia",
+        "Diagnostic imaging & laboratory panel",
+        "Specialty prescription regimen",
+        "Post-acute physical rehabilitation",
+    ],
+    "LIFE": [
+        "Primary term death benefit payout",
+        "Accidental death benefit rider",
+        "Total disability monthly indemnity",
+        "Critical illness lump-sum benefit",
+    ],
+    "TRAVEL": [
+        "Non-refundable flight & hotel rebooking",
+        "Emergency overseas medical evacuation",
+        "Lost baggage & personal effects reimbursement",
+        "Travel delay meal & lodging allowance",
+        "Out-of-country urgent clinic care",
+    ],
+}
+
 CLAIM_STATES = [
     "SUBMITTED",
-    "UNDER_REVIEW",
     "PENDING_DOCUMENTS",
+    "UNDER_REVIEW",
+    "SIU_INVESTIGATION",
     "APPROVED",
     "DENIED",
     "SETTLED",
@@ -200,37 +261,42 @@ CITIES_BY_STATE = {
 
 STREET_NAMES = ["Main", "Oak", "Pine", "Maple", "Cedar", "Elm", "Park", "Lake", "Hill", "River"]
 STREET_TYPES = ["St", "Ave", "Blvd", "Dr", "Ln", "Way"]
-EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "aol.com"]
+EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"]
 
-BASE_PREMIUMS = {"AUTO": 1200, "HOME": 1800, "HEALTH": 4800, "LIFE": 600, "TRAVEL": 200}
-
-# Distribution of claims across the 5 types
+BASE_PREMIUMS = {"AUTO": 1200, "HOME": 1800, "HEALTH": 4800, "LIFE": 600, "TRAVEL": 220}
 CLAIM_TYPE_SHARES = {"AUTO": 0.30, "HOME": 0.20, "HEALTH": 0.25, "LIFE": 0.10, "TRAVEL": 0.15}
+
+UNIT_COST_RANGES = {
+    "AUTO": (180.0, 4200.0),
+    "HOME": (350.0, 8500.0),
+    "HEALTH": (150.0, 6500.0),
+    "LIFE": (5000.0, 45000.0),
+    "TRAVEL": (85.0, 2200.0),
+}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-
 def _rand_date(start: datetime, end: datetime) -> datetime:
-    delta = end - start
-    return start + timedelta(days=random.randint(0, max(delta.days, 0)))
+    delta = (end - start).days
+    if delta <= 0:
+        return start
+    return start + timedelta(days=random.randint(0, delta))
 
 
 def _rand_phone() -> str:
     return f"({random.randint(200,999)}) {random.randint(200,999)}-{random.randint(1000,9999)}"
 
 
-def _rand_email(first: str, last: str) -> str:
-    sep = random.choice([".", "_", ""])
-    n = random.randint(1, 999)
-    return f"{first.lower()}{sep}{last.lower()}{n}@{random.choice(EMAIL_DOMAINS)}"
+def _rand_email(first: str, last: str, seq: int) -> str:
+    sep = random.choice([".", "_"])
+    return f"{first.lower()}{sep}{last.lower()}{seq}@{random.choice(EMAIL_DOMAINS)}"
 
 
 def _rc(val: float) -> float:
-    """Round to 2 decimals (currency)."""
-    return round(val, 2)
+    return round(float(val), 2)
 
 
 def _weighted(d: Dict[str, float]) -> str:
@@ -239,35 +305,35 @@ def _weighted(d: Dict[str, float]) -> str:
 
 def _state_change_reason(state: str, denial_reason: Optional[str] = None) -> str:
     return {
-        "SUBMITTED": "Claim submitted by policyholder",
-        "UNDER_REVIEW": "Assigned to adjuster for review",
-        "PENDING_DOCUMENTS": "Additional documentation requested",
-        "APPROVED": "Claim validated and approved for settlement",
-        "DENIED": denial_reason or "Coverage validation failed",
-        "SETTLED": "Settlement amount disbursed",
-        "CLOSED": "Claim process completed and archived",
-    }.get(state, "Status updated")
+        "SUBMITTED": "Claim intake recorded and linked to policy coverage",
+        "PENDING_DOCUMENTS": "Mandatory supporting documentation requested from claimant",
+        "UNDER_REVIEW": "All mandatory documents verified; assigned to specialist adjuster",
+        "SIU_INVESTIGATION": "Elevated fraud risk indicators detected; referred to Special Investigations Unit",
+        "APPROVED": "Eligibility assessment completed and settlement recommendation approved",
+        "DENIED": f"Claim denied: {denial_reason}" if denial_reason else "Coverage or eligibility validation failed",
+        "SETTLED": "Approved settlement payment disbursed to payee",
+        "CLOSED": "Financial reserve reconciled to zero and claim file archived",
+    }.get(state, "Lifecycle state updated")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN GENERATOR
 # ═══════════════════════════════════════════════════════════════════════════════
 
-
 class InsuranceDataGenerator:
-    """Deterministic, seed-controlled generator for the full claims-processing
-    data model.  Call ``generate_all()`` then ``export(output_dir)``."""
+    """Deterministic, seed-controlled generator for the full 14-table insurance
+    claims data model with bottom-up derived reconciliation and isolated edge cases."""
 
     def __init__(self, seed: int = DEFAULT_SEED, scale: str = "full"):
         self.seed = seed
         self.scale = scale
         self.cfg = SCALE_CONFIGS[scale]
+        self.rng = random.Random(seed)
         random.seed(seed)
 
-        # Monotonic counters keyed by prefix
         self._ctr: Dict[str, int] = defaultdict(int)
 
-        # Entity stores
+        # 11 Core Entity stores
         self.customers: List[dict] = []
         self.adjusters: List[dict] = []
         self.policies: List[dict] = []
@@ -279,19 +345,34 @@ class InsuranceDataGenerator:
         self.assessments: List[dict] = []
         self.reserves: List[dict] = []
         self.settlements: List[dict] = []
-        self.claim_state_history: List[dict] = []
-        self.ground_truth: List[dict] = []
 
-        # Indexes
+        # 2 Many-to-Many (N:M) Bridge Table stores
+        self.claim_adjuster_assignments: List[dict] = []
+        self.claim_coverage_allocations: List[dict] = []
+
+        # 1 Event History store
+        self.claim_state_history: List[dict] = []
+
+        # Ground Truth stores
+        self.ground_truth: List[dict] = []
+        self.ground_truth_decisions: List[dict] = []
+
+        # Internal lookup indexes
         self._pol: Dict[str, dict] = {}
         self._cust: Dict[str, dict] = {}
         self._cov_by_pol: Dict[str, List[dict]] = defaultdict(list)
+        self._cov_by_id: Dict[str, dict] = {}
         self._inc: Dict[str, dict] = {}
         self._clm: Dict[str, dict] = {}
         self._adj: Dict[str, dict] = {}
         self._adj_by_prod: Dict[str, List[str]] = defaultdict(list)
+        self._items_by_clm: Dict[str, List[dict]] = defaultdict(list)
+        self._docs_by_clm: Dict[str, List[dict]] = defaultdict(list)
+        self._asn_by_clm: Dict[str, dict] = {}
+        self._rsv_by_clm: Dict[str, dict] = {}
+        self._set_by_clm: Dict[str, List[dict]] = defaultdict(list)
 
-    # ── ID factories ──────────────────────────────────────────────────────────
+    # ── Deterministic ID factories (strictly adhering to nomenclature) ────────
 
     def _next(self, prefix: str) -> int:
         self._ctr[prefix] += 1
@@ -327,10 +408,16 @@ class InsuranceDataGenerator:
     def _set_id(self, clm_id: str) -> str:
         return f"SET-{clm_id}-{self._next(f'SET-{clm_id}'):03d}"
 
-    # ── 1. Customers ──────────────────────────────────────────────────────────
+    def _caa_id(self, clm_id: str) -> str:
+        return f"CAA-{clm_id}-{self._next(f'CAA-{clm_id}'):03d}"
 
-    def _gen_customers(self):
-        for _ in range(self.cfg["num_customers"]):
+    def _cca_id(self, clm_id: str) -> str:
+        return f"CCA-{clm_id}-{self._next(f'CCA-{clm_id}'):03d}"
+
+    # ── Step 1: Customers ─────────────────────────────────────────────────────
+
+    def _gen_customers(self) -> None:
+        for idx in range(1, self.cfg["num_customers"] + 1):
             cid = self._cust_id()
             state = random.choice(STATES_LIST)
             city = random.choice(CITIES_BY_STATE[state])
@@ -341,9 +428,9 @@ class InsuranceDataGenerator:
                 "first_name": first,
                 "last_name": last,
                 "date_of_birth": _rand_date(
-                    datetime(1950, 1, 1), datetime(2000, 12, 31)
+                    datetime(1950, 1, 1), datetime(2002, 12, 31)
                 ).strftime("%Y-%m-%d"),
-                "email": _rand_email(first, last),
+                "email": _rand_email(first, last, idx),
                 "phone": _rand_phone(),
                 "address_line1": (
                     f"{random.randint(100,9999)} "
@@ -353,32 +440,41 @@ class InsuranceDataGenerator:
                 "city": city,
                 "state": state,
                 "zip_code": f"{random.randint(10000,99999)}",
+                "risk_tier": random.choices(
+                    ["LOW", "STANDARD", "ELEVATED"], weights=[0.35, 0.50, 0.15], k=1
+                )[0],
                 "created_at": _rand_date(
-                    datetime(2020, 1, 1), datetime(2024, 12, 31)
+                    datetime(2020, 1, 1), datetime(2023, 12, 31)
                 ).strftime("%Y-%m-%d %H:%M:%S"),
                 "status": random.choices(
-                    ["ACTIVE", "INACTIVE"], weights=[0.9, 0.1], k=1
+                    ["ACTIVE", "INACTIVE"], weights=[0.92, 0.08], k=1
                 )[0],
             }
             self.customers.append(rec)
             self._cust[cid] = rec
 
-    # ── 2. Adjusters ──────────────────────────────────────────────────────────
+    # ── Step 2: Adjusters ─────────────────────────────────────────────────────
 
-    def _gen_adjusters(self):
-        for _ in range(self.cfg["num_adjusters"]):
+    def _gen_adjusters(self) -> None:
+        for idx in range(1, self.cfg["num_adjusters"] + 1):
             aid = self._adj_id()
             first = random.choice(FIRST_NAMES)
             last = random.choice(LAST_NAMES)
-            specs = random.sample(PRODUCTS, k=random.randint(1, 3))
+            specs = sorted(random.sample(PRODUCTS, k=random.randint(1, 3)))
+            role_tier = random.choices(
+                ["SENIOR_ADJUSTER", "STANDARD_ADJUSTER", "SIU_SPECIALIST"],
+                weights=[0.25, 0.60, 0.15],
+                k=1,
+            )[0]
             rec = {
                 "adjuster_id": aid,
                 "first_name": first,
                 "last_name": last,
-                "email": _rand_email(first, last),
+                "email": _rand_email(first, last, 1000 + idx),
                 "phone": _rand_phone(),
                 "specializations": ",".join(specs),
-                "license_number": f"ADJ-LIC-{random.randint(100000,999999)}",
+                "role_tier": role_tier,
+                "license_number": f"ADJ-LIC-{100000 + idx:06d}",
                 "hire_date": _rand_date(
                     datetime(2015, 1, 1), datetime(2024, 6, 30)
                 ).strftime("%Y-%m-%d"),
@@ -387,7 +483,7 @@ class InsuranceDataGenerator:
                     weights=[0.85, 0.10, 0.05],
                     k=1,
                 )[0],
-                "max_concurrent_claims": random.choice([10, 15, 20, 25]),
+                "max_concurrent_claims": random.choice([15, 20, 25, 30]),
             }
             self.adjusters.append(rec)
             self._adj[aid] = rec
@@ -395,44 +491,51 @@ class InsuranceDataGenerator:
                 for s in specs:
                     self._adj_by_prod[s].append(aid)
 
-        # Guarantee at least one active specialist for each product, including
-        # the small starter scale, so the operational demo always has an assignee.
+        # Guarantee at least 2 active specialists per product + 1 active SIU specialist
         for product in PRODUCTS:
-            candidates = [a for a in self.adjusters if product in a["specializations"].split(",")]
-            active = next((a for a in candidates if a["status"] == "ACTIVE"), None)
-            if active:
-                continue
-            target = candidates[0] if candidates else self.adjusters[0]
-            target["status"] = "ACTIVE"
-            if product not in target["specializations"].split(","):
-                target["specializations"] = ",".join([target["specializations"], product]).strip(",")
-            if target["adjuster_id"] not in self._adj_by_prod[product]:
-                self._adj_by_prod[product].append(target["adjuster_id"])
+            while len(self._adj_by_prod[product]) < 2:
+                target = random.choice(self.adjusters)
+                target["status"] = "ACTIVE"
+                cur_specs = set(target["specializations"].split(","))
+                cur_specs.add(product)
+                target["specializations"] = ",".join(sorted(cur_specs))
+                if target["adjuster_id"] not in self._adj_by_prod[product]:
+                    self._adj_by_prod[product].append(target["adjuster_id"])
 
-    # ── 3. Policies ───────────────────────────────────────────────────────────
+        if not any(a["status"] == "ACTIVE" and a["role_tier"] == "SIU_SPECIALIST" for a in self.adjusters):
+            self.adjusters[0]["status"] = "ACTIVE"
+            self.adjusters[0]["role_tier"] = "SIU_SPECIALIST"
 
-    def _gen_policies(self):
+    # ── Step 3: Policies ──────────────────────────────────────────────────────
+
+    def _gen_policies(self) -> None:
         cust_ids = [c["customer_id"] for c in self.customers]
         for _ in range(self.cfg["num_policies"]):
             product = random.choice(PRODUCTS)
             pid = self._pol_id(product)
             cid = random.choice(cust_ids)
             start = _rand_date(*POLICY_START_RANGE)
-            term = random.choice([6, 12, 24, 36])
+            term = random.choice([12, 12, 24, 36])
             end = start + timedelta(days=term * 30)
             st = _weighted(POLICY_STATE_WEIGHTS)
             cancel_dt = None
             lapse_dt = None
             if st == "CANCELLED":
                 cancel_dt = _rand_date(
-                    start + timedelta(days=30), end
+                    start + timedelta(days=30), end - timedelta(days=30)
                 ).strftime("%Y-%m-%d")
             elif st == "LAPSED":
                 lapse_dt = _rand_date(
-                    start + timedelta(days=60), end
+                    start + timedelta(days=45), end - timedelta(days=30)
                 ).strftime("%Y-%m-%d")
+            elif st == "EXPIRED":
+                # Make expired policies have an expiration date in early 2025/2026
+                start = _rand_date(datetime(2024, 1, 1), datetime(2024, 9, 30))
+                term = 12
+                end = start + timedelta(days=365)
+
             premium = _rc(
-                BASE_PREMIUMS[product] * random.uniform(0.5, 2.5) * (term / 12)
+                BASE_PREMIUMS[product] * random.uniform(0.75, 2.15) * (term / 12)
             )
             rec = {
                 "policy_id": pid,
@@ -450,8 +553,8 @@ class InsuranceDataGenerator:
                 "cancellation_date": cancel_dt,
                 "lapse_date": lapse_dt,
                 "underwriting_status": random.choices(
-                    ["APPROVED", "CONDITIONAL", "DECLINED"],
-                    weights=[0.80, 0.15, 0.05],
+                    ["APPROVED", "CONDITIONAL"],
+                    weights=[0.88, 0.12],
                     k=1,
                 )[0],
                 "created_at": start.strftime("%Y-%m-%d %H:%M:%S"),
@@ -460,23 +563,24 @@ class InsuranceDataGenerator:
             self.policies.append(rec)
             self._pol[pid] = rec
 
-    # ── 4. Coverages ──────────────────────────────────────────────────────────
+    # ── Step 4: Coverages ─────────────────────────────────────────────────────
 
-    def _gen_coverages(self):
+    def _gen_coverages(self) -> None:
         for pol in self.policies:
             prod = pol["product_type"]
             cc = COVERAGE_CONFIG[prod]
             n = random.randint(2, min(4, len(cc["types"])))
             for cov_type in random.sample(cc["types"], n):
                 cov_id = self._cov_id(pol["policy_id"])
-                lim = _rc(random.uniform(*cc["limit_range"]))
+                lim = _rc(random.randint(int(cc["limit_range"][0] / 1000), int(cc["limit_range"][1] / 1000)) * 1000)
                 ded = (
-                    _rc(random.uniform(*cc["deductible_range"]))
+                    _rc(random.choice([250, 500, 1000, 1500, 2000, 2500]))
                     if cc["deductible_range"][1] > 0
                     else 0.0
                 )
+                ded = min(ded, float(cc["deductible_range"][1]))
                 ne = random.randint(0, min(2, len(cc["exclusions"])))
-                excl = random.sample(cc["exclusions"], ne)
+                excl = sorted(random.sample(cc["exclusions"], ne))
                 rec = {
                     "coverage_id": cov_id,
                     "policy_id": pol["policy_id"],
@@ -484,7 +588,7 @@ class InsuranceDataGenerator:
                     "coverage_limit": lim,
                     "deductible": ded,
                     "co_pay_percentage": (
-                        random.choice([0, 10, 20, 30]) if prod == "HEALTH" else 0
+                        random.choice([0, 10, 20]) if prod == "HEALTH" else 0
                     ),
                     "exclusions": ",".join(excl) if excl else "",
                     "effective_date": pol["effective_date"],
@@ -493,126 +597,87 @@ class InsuranceDataGenerator:
                 }
                 self.coverages.append(rec)
                 self._cov_by_pol[pol["policy_id"]].append(rec)
+                self._cov_by_id[cov_id] = rec
 
-    # ── 5. Incidents ──────────────────────────────────────────────────────────
+    # ── Step 5: Baseline Valid Incidents & Claims + Controlled Scenarios ──────
 
-    def _gen_incidents(self):
-        n = int(self.cfg["num_claims"] * 1.15)
-        for _ in range(n):
-            iid = self._inc_id()
-            prod = random.choice(PRODUCTS)
-            itype = random.choice(INCIDENT_TYPES[prod])
-            idate = _rand_date(*CLAIM_DATE_RANGE)
-            state = random.choice(STATES_LIST)
-            city = random.choice(CITIES_BY_STATE[state])
-            rec = {
-                "incident_id": iid,
-                "incident_type": itype,
-                "incident_date": idate.strftime("%Y-%m-%d"),
-                "incident_time": f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:00",
-                "description": f"{itype.replace('_',' ').title()} incident reported",
-                "location_city": city,
-                "location_state": state,
-                "severity": random.choices(
-                    ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
-                    weights=[0.30, 0.40, 0.20, 0.10],
-                    k=1,
-                )[0],
-                "police_report_filed": random.choices(
-                    [True, False], weights=[0.6, 0.4], k=1
-                )[0],
-                "witnesses": random.randint(0, 5),
-                "product_category": prod,
-                "reported_date": (
-                    idate + timedelta(days=random.randint(0, 14))
-                ).strftime("%Y-%m-%d"),
-            }
-            self.incidents.append(rec)
-            self._inc[iid] = rec
-
-    # ── 6. Claims ─────────────────────────────────────────────────────────────
-
-    def _gen_claims(self):
-        total = self.cfg["num_claims"]
-        per_type = {
-            p: int(total * CLAIM_TYPE_SHARES[p]) for p in PRODUCTS
+    def _create_incident_for_policy(
+        self, pol: dict, idate: datetime, itype: Optional[str] = None
+    ) -> dict:
+        iid = self._inc_id()
+        prod = pol["product_type"]
+        chosen_type = itype or random.choice(INCIDENT_TYPES[prod])
+        state = random.choice(STATES_LIST)
+        city = random.choice(CITIES_BY_STATE[state])
+        reported_delay = random.randint(0, 10)
+        rdate = idate + timedelta(days=reported_delay)
+        rec = {
+            "incident_id": iid,
+            "incident_type": chosen_type,
+            "incident_date": idate.strftime("%Y-%m-%d"),
+            "incident_time": f"{random.randint(0,23):02d}:{random.randint(0,59):02d}:00",
+            "description": f"{chosen_type.replace('_',' ').title()} incident reported in {city}, {state}",
+            "location_city": city,
+            "location_state": state,
+            "severity": random.choices(
+                ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+                weights=[0.28, 0.42, 0.20, 0.10],
+                k=1,
+            )[0],
+            "police_report_filed": random.choices(
+                [True, False], weights=[0.65, 0.35], k=1
+            )[0],
+            "witnesses": random.randint(0, 4),
+            "product_category": prod,
+            "reported_date": rdate.strftime("%Y-%m-%d"),
         }
-        # fix rounding
+        self.incidents.append(rec)
+        self._inc[iid] = rec
+        return rec
+
+    def _gen_incidents_and_claims(self) -> None:
+        """Generates baseline valid claims with coherent dates first, plus
+        unclaimed incidents so total incidents exceed claims realistically."""
+        total = self.cfg["num_claims"]
+        per_type = {p: int(total * CLAIM_TYPE_SHARES[p]) for p in PRODUCTS}
         per_type["AUTO"] += total - sum(per_type.values())
 
-        pols_by_prod: Dict[str, list] = defaultdict(list)
+        # Group ACTIVE policies by product for clean baseline claim generation
+        active_pols_by_prod: Dict[str, List[dict]] = defaultdict(list)
         for p in self.policies:
-            pols_by_prod[p["product_type"]].append(p)
-
-        incs_by_prod: Dict[str, list] = defaultdict(list)
-        for i in self.incidents:
-            incs_by_prod[i["product_category"]].append(i)
+            if p["status"] == "ACTIVE":
+                active_pols_by_prod[p["product_type"]].append(p)
 
         for prod, count in per_type.items():
-            avail_pols = pols_by_prod.get(prod, [])
-            avail_incs = incs_by_prod.get(prod, [])
-            if not avail_pols or not avail_incs:
-                continue
+            avail_pols = active_pols_by_prod[prod]
             for _ in range(count):
                 cid = self._clm_id()
                 pol = random.choice(avail_pols)
-                inc = random.choice(avail_incs)
-
                 p_start = datetime.strptime(pol["effective_date"], "%Y-%m-%d")
                 p_end = datetime.strptime(pol["expiration_date"], "%Y-%m-%d")
-                i_date = datetime.strptime(inc["incident_date"], "%Y-%m-%d")
+                # Keep baseline incident date strictly within active policy period
+                valid_end = min(p_end - timedelta(days=15), datetime(2026, 10, 1))
+                if valid_end <= p_start:
+                    valid_end = p_start + timedelta(days=30)
+                idate = _rand_date(p_start + timedelta(days=5), valid_end)
+                inc = self._create_incident_for_policy(pol, idate)
 
-                valid = True
-                deny = None
+                covs = self._cov_by_pol[pol["policy_id"]]
+                # Pick primary coverage (highest limit or random active coverage)
+                sel_cov = max(covs, key=lambda c: c["coverage_limit"])
+                sub_date = datetime.strptime(inc["reported_date"], "%Y-%m-%d") + timedelta(
+                    days=random.randint(0, 5)
+                )
 
-                if i_date < p_start or i_date > p_end:
-                    valid = False
-                    deny = "INCIDENT_OUTSIDE_COVERAGE_PERIOD"
+                adj_pool = self._adj_by_prod[prod]
+                assigned_adj = random.choice(adj_pool)
 
-                if pol["status"] == "CANCELLED" and pol.get("cancellation_date"):
-                    cd = datetime.strptime(pol["cancellation_date"], "%Y-%m-%d")
-                    if i_date > cd:
-                        valid = False
-                        deny = "POLICY_CANCELLED_BEFORE_INCIDENT"
-
-                if pol["status"] == "LAPSED" and pol.get("lapse_date"):
-                    ld = datetime.strptime(pol["lapse_date"], "%Y-%m-%d")
-                    if i_date > ld:
-                        valid = False
-                        deny = "POLICY_LAPSED_BEFORE_INCIDENT"
-
-                covs = self._cov_by_pol.get(pol["policy_id"], [])
-                if not covs:
-                    valid = False
-                    deny = "NO_COVERAGE_FOUND"
-
-                sel_cov = random.choice(covs) if covs else None
-                if sel_cov:
-                    cl = sel_cov["coverage_limit"]
-                    claim_amt = _rc(random.uniform(500, cl * 0.8))
-                else:
-                    cl = 0
-                    claim_amt = _rc(random.uniform(500, 50000))
-
-                if not valid:
-                    status = "DENIED"
-                else:
-                    status = random.choices(
-                        ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "SETTLED", "CLOSED"],
-                        weights=[0.10, 0.15, 0.20, 0.35, 0.20],
-                        k=1,
-                    )[0]
-
-                sub_date = datetime.strptime(
-                    inc["reported_date"], "%Y-%m-%d"
-                ) + timedelta(days=random.randint(0, 7))
-
-                adj_pool = self._adj_by_prod.get(prod, [])
-                if not adj_pool:
-                    adj_pool = [a["adjuster_id"] for a in self.adjusters]
-                assigned_adj = random.choice(adj_pool) if adj_pool else None
-
-                fraud = random.choices([False, True], weights=[0.95, 0.05], k=1)[0]
+                # Baseline valid status progression
+                status = random.choices(
+                    ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "SETTLED", "CLOSED"],
+                    weights=[0.08, 0.14, 0.18, 0.32, 0.28],
+                    k=1,
+                )[0]
 
                 rec = {
                     "claim_id": cid,
@@ -620,564 +685,797 @@ class InsuranceDataGenerator:
                     "customer_id": pol["customer_id"],
                     "incident_id": inc["incident_id"],
                     "claim_type": prod,
-                    "claim_amount": claim_amt,
+                    "claim_amount": 0.0,  # Strictly derived from ClaimItems in Step 6!
                     "submission_date": sub_date.strftime("%Y-%m-%d"),
                     "status": status,
                     "assigned_adjuster_id": assigned_adj,
                     "priority": random.choices(
                         ["LOW", "MEDIUM", "HIGH", "URGENT"],
-                        weights=[0.20, 0.40, 0.30, 0.10],
+                        weights=[0.22, 0.43, 0.25, 0.10],
                         k=1,
                     )[0],
-                    "denial_reason": deny,
-                    "fraud_indicator": fraud,
-                    "coverage_id": sel_cov["coverage_id"] if sel_cov else None,
+                    "denial_reason": None,
+                    "fraud_indicator": False,
+                    "coverage_id": sel_cov["coverage_id"],
                     "created_at": sub_date.strftime("%Y-%m-%d %H:%M:%S"),
-                    "updated_at": (
-                        sub_date + timedelta(days=random.randint(1, 60))
-                    ).strftime("%Y-%m-%d %H:%M:%S"),
+                    "updated_at": (sub_date + timedelta(days=random.randint(5, 45))).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
                 }
                 self.claims.append(rec)
                 self._clm[cid] = rec
-                self._build_state_history(rec, sub_date)
 
-    # ── state-history helper ──────────────────────────────────────────────────
+        # Also create 12% extra standalone incidents (unclaimed reports)
+        extra_incidents = max(10, int(total * 0.12))
+        for _ in range(extra_incidents):
+            pol = random.choice(self.policies)
+            p_start = datetime.strptime(pol["effective_date"], "%Y-%m-%d")
+            p_end = datetime.strptime(pol["expiration_date"], "%Y-%m-%d")
+            idate = _rand_date(p_start, p_end)
+            self._create_incident_for_policy(pol, idate)
 
-    def _build_state_history(self, claim: dict, sub_date: datetime):
-        seq = ["SUBMITTED"]
-        cur = claim["status"]
-        transitions = {
-            "DENIED":        ["UNDER_REVIEW", "DENIED"],
-            "UNDER_REVIEW":  ["UNDER_REVIEW"],
-            "APPROVED":      ["UNDER_REVIEW", "APPROVED"],
-            "SETTLED":       ["UNDER_REVIEW", "APPROVED", "SETTLED"],
-            "CLOSED":        ["UNDER_REVIEW", "APPROVED", "SETTLED", "CLOSED"],
-        }
-        seq.extend(transitions.get(cur, []))
-        ts = sub_date
-        for i, s in enumerate(seq):
-            self.claim_state_history.append(
-                {
-                    "event_id": f"EVT-{claim['claim_id']}-{i+1:03d}",
-                    "claim_id": claim["claim_id"],
-                    "from_status": seq[i - 1] if i > 0 else None,
-                    "to_status": s,
-                    "changed_by": (
-                        claim["assigned_adjuster_id"] if i > 0 else "SYSTEM"
-                    ),
-                    "change_reason": _state_change_reason(
-                        s, claim.get("denial_reason")
-                    ),
-                    "event_timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
-                }
-            )
-            ts += timedelta(days=random.randint(1, 14))
+    # ── Step 6: Bottom-Up ClaimItems & Derived Claim Totals ───────────────────
 
-    # ── 7. Claim Items ────────────────────────────────────────────────────────
-
-    def _gen_claim_items(self):
-        item_descs = {
-            "AUTO": ["Vehicle body repair", "Windshield replacement", "Towing service",
-                      "Rental car", "Paint restoration"],
-            "HOME": ["Roof repair", "Water extraction", "Furniture replacement",
-                      "Electrical rewiring", "Structural assessment"],
-            "HEALTH": ["Hospital stay", "Surgical procedure", "Lab tests",
-                        "Prescription medication", "Physical therapy"],
-            "LIFE": ["Death benefit payout", "Accidental death rider",
-                      "Disability income", "Critical illness lump sum"],
-            "TRAVEL": ["Trip rebooking", "Emergency evacuation", "Lost luggage compensation",
-                        "Hotel accommodation", "Medical treatment abroad"],
-        }
+    def _gen_claim_items_and_derive_totals(self) -> None:
+        """Generates ClaimItems first, then derives claims.claim_amount as the exact
+        sum of item claimed_amounts so reconciliation is 100% exact."""
         for clm in self.claims:
-            n = random.randint(1, 5)
-            descs = item_descs.get(clm["claim_type"], ["General item"])
-            for i in range(n):
-                amt = _rc(clm["claim_amount"] / n * random.uniform(0.5, 1.5))
-                qty = random.randint(1, 3)
-                approved = clm["status"] in ("APPROVED", "SETTLED", "CLOSED")
-                self.claim_items.append(
-                    {
-                        "claim_item_id": f"CLI-{clm['claim_id']}-{i+1:03d}",
-                        "claim_id": clm["claim_id"],
-                        "item_description": descs[i % len(descs)],
-                        "item_category": clm["claim_type"],
-                        "claimed_amount": amt,
-                        "approved_amount": (
-                            _rc(amt * random.uniform(0.5, 1.0)) if approved else None
-                        ),
-                        "quantity": qty,
-                        "unit_cost": _rc(amt / qty),
-                        "status": (
-                            "APPROVED"
-                            if approved
-                            else ("DENIED" if clm["status"] == "DENIED" else "PENDING")
-                        ),
-                    }
-                )
+            prod = clm["claim_type"]
+            cov = self._cov_by_id[clm["coverage_id"]]
+            limit = float(cov["coverage_limit"])
+            ded = float(cov["deductible"])
+            descs = ITEM_DESCRIPTIONS[prod]
+            n_items = random.randint(2, min(4, len(descs)))
+            lo_cost, hi_cost = UNIT_COST_RANGES[prod]
+            # Keep normal baseline claims comfortably above deductible and within coverage limit
+            max_item_budget = max(lo_cost * 1.5, min(hi_cost, (limit * 0.70) / n_items))
+            min_item_budget = max(lo_cost, (ded * 1.35) / n_items)
+            if min_item_budget >= max_item_budget:
+                min_item_budget = max_item_budget * 0.6
 
-    # ── 8. Documents ──────────────────────────────────────────────────────────
+            is_approved_state = clm["status"] in ("APPROVED", "SETTLED", "CLOSED")
+            is_denied_state = clm["status"] == "DENIED"
 
-    def _gen_documents(self):
+            total_claimed = 0.0
+            for i in range(n_items):
+                qty = random.randint(1, 3) if prod != "LIFE" else 1
+                unit_cost = _rc(random.uniform(min_item_budget, max_item_budget) / qty)
+                claimed_amt = _rc(qty * unit_cost)
+                if is_approved_state:
+                    # Approved line item is 80%-100% of claimed_amount
+                    factor = random.choice([0.85, 0.90, 0.95, 1.0, 1.0])
+                    approved_amt = _rc(claimed_amt * factor)
+                    item_status = "APPROVED"
+                elif is_denied_state:
+                    approved_amt = 0.0
+                    item_status = "DENIED"
+                else:
+                    approved_amt = None
+                    item_status = "PENDING"
+
+                item_rec = {
+                    "claim_item_id": f"CLI-{clm['claim_id']}-{i+1:03d}",
+                    "claim_id": clm["claim_id"],
+                    "item_description": descs[i % len(descs)],
+                    "item_category": prod,
+                    "claimed_amount": claimed_amt,
+                    "approved_amount": approved_amt,
+                    "quantity": qty,
+                    "unit_cost": unit_cost,
+                    "status": item_status,
+                }
+                self.claim_items.append(item_rec)
+                self._items_by_clm[clm["claim_id"]].append(item_rec)
+                total_claimed = _rc(total_claimed + claimed_amt)
+
+            clm["claim_amount"] = total_claimed
+
+    # ── Step 7: Documents (Aligned with Claim Lifecycle State!) ───────────────
+
+    def _gen_documents(self) -> None:
+        """Generates mandatory documents per claim. Crucially, claims in APPROVED,
+        SETTLED, or CLOSED states always have VERIFIED/RECEIVED documents, never REJECTED."""
         for clm in self.claims:
             prod = clm["claim_type"]
             req = COVERAGE_CONFIG[prod]["required_docs"]
             sub = datetime.strptime(clm["submission_date"], "%Y-%m-%d")
             for doc_type in req:
                 did = self._doc_id(clm["claim_id"])
-                self.documents.append(
-                    {
-                        "document_id": did,
-                        "claim_id": clm["claim_id"],
-                        "document_type": doc_type,
-                        "file_name": f"{doc_type.lower()}_{clm['claim_id']}.pdf",
-                        "file_size_kb": random.randint(50, 5000),
-                        "upload_date": (
-                            sub + timedelta(days=random.randint(0, 10))
-                        ).strftime("%Y-%m-%d"),
-                        "uploaded_by": clm["customer_id"],
-                        "status": random.choices(
-                            ["RECEIVED", "VERIFIED", "REJECTED"],
-                            weights=[0.30, 0.60, 0.10],
-                            k=1,
-                        )[0],
-                        "verification_date": (
-                            (sub + timedelta(days=random.randint(5, 20))).strftime(
-                                "%Y-%m-%d"
-                            )
-                            if random.random() > 0.2
-                            else None
-                        ),
-                        "notes": "",
-                    }
-                )
+                upload_dt = sub + timedelta(days=random.randint(0, 6))
+                if clm["status"] in ("APPROVED", "SETTLED", "CLOSED"):
+                    doc_status = "VERIFIED"
+                    ver_dt = (upload_dt + timedelta(days=random.randint(1, 5))).strftime("%Y-%m-%d")
+                elif clm["status"] == "UNDER_REVIEW":
+                    doc_status = random.choice(["RECEIVED", "VERIFIED"])
+                    ver_dt = (
+                        (upload_dt + timedelta(days=random.randint(1, 5))).strftime("%Y-%m-%d")
+                        if doc_status == "VERIFIED"
+                        else None
+                    )
+                else:
+                    doc_status = "RECEIVED"
+                    ver_dt = None
 
-    # ── 9. Assessments ────────────────────────────────────────────────────────
-
-    def _gen_assessments(self):
-        for clm in self.claims:
-            if clm["status"] == "SUBMITTED":
-                continue
-            aid = self._asn_id(clm["claim_id"])
-            sub = datetime.strptime(clm["submission_date"], "%Y-%m-%d")
-            cov = None
-            if clm.get("coverage_id"):
-                for c in self._cov_by_pol.get(clm["policy_id"], []):
-                    if c["coverage_id"] == clm["coverage_id"]:
-                        cov = c
-                        break
-            cl = cov["coverage_limit"] if cov else 0
-            ded = cov["deductible"] if cov else 0
-            assessed = _rc(clm["claim_amount"] * random.uniform(0.7, 1.0))
-            eligible = max(0.0, _rc(assessed - ded))
-            if cl > 0:
-                eligible = min(eligible, cl)
-            is_approved = clm["status"] in ("APPROVED", "SETTLED", "CLOSED")
-            self.assessments.append(
-                {
-                    "assessment_id": aid,
+                doc_rec = {
+                    "document_id": did,
                     "claim_id": clm["claim_id"],
-                    "adjuster_id": clm["assigned_adjuster_id"],
-                    "assessment_date": (
-                        sub + timedelta(days=random.randint(3, 21))
-                    ).strftime("%Y-%m-%d"),
-                    "assessed_amount": assessed,
-                    "deductible_applied": ded,
-                    "eligible_amount": eligible,
-                    "coverage_limit": cl,
-                    "coverage_verified": clm["status"] != "DENIED",
-                    "liability_percentage": random.choice([0, 25, 50, 75, 100]),
-                    "recommendation": (
-                        "APPROVE"
-                        if is_approved
-                        else ("DENY" if clm["status"] == "DENIED" else "REVIEW")
-                    ),
-                    "notes": f"Assessment completed for claim {clm['claim_id']}",
-                    "fraud_score": (
-                        round(random.uniform(0, 0.3), 3)
-                        if not clm["fraud_indicator"]
-                        else round(random.uniform(0.5, 1.0), 3)
-                    ),
+                    "document_type": doc_type,
+                    "file_name": f"{doc_type.lower()}_{clm['claim_id']}.pdf",
+                    "file_size_kb": random.randint(80, 4800),
+                    "upload_date": upload_dt.strftime("%Y-%m-%d"),
+                    "uploaded_by": clm["customer_id"],
+                    "status": doc_status,
+                    "verification_date": ver_dt,
+                    "notes": f"Mandatory {doc_type} evidence for {prod} claim",
                 }
-            )
+                self.documents.append(doc_rec)
+                self._docs_by_clm[clm["claim_id"]].append(doc_rec)
 
-    # ── 10. Reserves ──────────────────────────────────────────────────────────
-
-    def _gen_reserves(self):
-        for clm in self.claims:
-            if clm["status"] in ("SUBMITTED", "DENIED"):
-                continue
-            rid = self._rsv_id(clm["claim_id"])
-            sub = datetime.strptime(clm["submission_date"], "%Y-%m-%d")
-            amt = _rc(clm["claim_amount"] * random.uniform(0.8, 1.2))
-            self.reserves.append(
-                {
-                    "reserve_id": rid,
-                    "claim_id": clm["claim_id"],
-                    "initial_reserve": amt,
-                    "current_reserve": amt,
-                    "reserve_type": "CASE",
-                    "set_date": (
-                        sub + timedelta(days=random.randint(1, 7))
-                    ).strftime("%Y-%m-%d"),
-                    "last_updated": (
-                        sub + timedelta(days=random.randint(7, 30))
-                    ).strftime("%Y-%m-%d"),
-                    "set_by": clm["assigned_adjuster_id"],
-                    "currency": "USD",
-                    "status": (
-                        "OPEN"
-                        if clm["status"] in ("UNDER_REVIEW", "APPROVED")
-                        else "CLOSED"
-                    ),
-                }
-            )
-
-    # ── 11. Settlements ───────────────────────────────────────────────────────
-
-    def _gen_settlements(self):
-        # Index assessments by claim_id for fast lookup
-        asn_idx: Dict[str, dict] = {}
-        for a in self.assessments:
-            asn_idx.setdefault(a["claim_id"], a)
-
-        for clm in self.claims:
-            if clm["status"] not in ("SETTLED", "CLOSED"):
-                continue
-            sid = self._set_id(clm["claim_id"])
-            sub = datetime.strptime(clm["submission_date"], "%Y-%m-%d")
-            asn = asn_idx.get(clm["claim_id"])
-            s_amt = asn["eligible_amount"] if asn else _rc(clm["claim_amount"] * 0.8)
-            s_date = sub + timedelta(days=random.randint(14, 90))
-            cust = self._cust.get(clm["customer_id"], {})
-            self.settlements.append(
-                {
-                    "settlement_id": sid,
-                    "claim_id": clm["claim_id"],
-                    "assessment_id": asn["assessment_id"] if asn else None,
-                    "settlement_amount": s_amt,
-                    "payment_method": random.choice(
-                        ["CHECK", "ACH", "WIRE_TRANSFER", "DIRECT_DEPOSIT"]
-                    ),
-                    "payment_date": s_date.strftime("%Y-%m-%d"),
-                    "approved_by": clm["assigned_adjuster_id"],
-                    "approved_date": (
-                        s_date - timedelta(days=random.randint(1, 7))
-                    ).strftime("%Y-%m-%d"),
-                    "status": (
-                        "PAID"
-                        if clm["status"] == "CLOSED"
-                        else random.choice(["PENDING", "APPROVED", "PAID"])
-                    ),
-                    "payee_name": (
-                        f"{cust.get('first_name','')} {cust.get('last_name','')}"
-                    ).strip(),
-                    "payee_customer_id": clm["customer_id"],
-                    "notes": f"Settlement for claim {clm['claim_id']}",
-                }
-            )
-
-    # ── 12. Edge-case injection ───────────────────────────────────────────────
-
-    def _clone_incident_for_claim(self, clm: dict, incident: dict, new_date: str) -> dict:
-        """Keep an injected incident anomaly isolated to its labelled claim."""
-        clone = dict(incident)
-        clone["incident_id"] = self._inc_id()
-        clone["incident_date"] = new_date
-        self.incidents.append(clone)
-        self._inc[clone["incident_id"]] = clone
-        clm["incident_id"] = clone["incident_id"]
-        return clone
-
-    def _record_injected_state(self, clm: dict, new_status: str, reason: str) -> None:
-        history = [e for e in self.claim_state_history if e["claim_id"] == clm["claim_id"]]
-        history.sort(key=lambda e: e["event_timestamp"])
-        current = history[-1]["to_status"] if history else None
-        if current == new_status:
-            return
-        path = [new_status]
-        if current == "SUBMITTED" and new_status == "DENIED":
-            path = ["UNDER_REVIEW", "DENIED"]
-        stamp = (datetime.strptime(history[-1]["event_timestamp"], "%Y-%m-%d %H:%M:%S")
-                 if history else datetime.strptime(clm["submission_date"], "%Y-%m-%d"))
-        for status in path:
-            stamp += timedelta(minutes=1)
-            seq = len(history) + 1
-            event = {
-                "event_id": f"EVT-{clm['claim_id']}-{seq:03d}",
-                "claim_id": clm["claim_id"],
-                "from_status": current,
-                "to_status": status,
-                "changed_by": "SYSTEM",
-                "change_reason": reason,
-                "event_timestamp": stamp.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            self.claim_state_history.append(event)
-            history.append(event)
-            current = status
-
-    def _reflect_injected_denial(self, claim_id: str, reason: str) -> None:
-        for assessment in self.assessments:
-            if assessment["claim_id"] == claim_id:
-                assessment["recommendation"] = "DENY"
-                assessment["coverage_verified"] = False
-                assessment["notes"] = f"Denied: {reason}"
-        for reserve in self.reserves:
-            if reserve["claim_id"] == claim_id:
-                reserve["status"] = "CLOSED"
+    # ── Step 8: Inject Portfolio Exceptions & All 6 Required Edge Cases ───────
 
     def _edge_target(self, full_scale_count: int) -> int:
-        """Keep all six scenario classes in starter data at a smaller count."""
-        return full_scale_count if self.scale == "full" else 1
+        return full_scale_count if self.scale == "full" else max(1, full_scale_count // 5)
 
-    def _inject_edge_cases(self):
-        # ── EC-1  Claim date before policy start (10 cases) ───────────────────
-        count = 0
-        for clm in self.claims:
-            if count >= self._edge_target(10):
-                break
-            if clm["status"] in {"DENIED", "SETTLED", "CLOSED"}:
-                continue
-            pol = self._pol.get(clm["policy_id"])
-            inc = self._inc.get(clm["incident_id"])
-            if not pol or not inc:
-                continue
+    def _inject_all_scenarios_before_downstream_derivation(self) -> None:
+        """Injects both the 6 required negative edge cases and the Step-4 portfolio
+        exception scenarios BEFORE deriving Assessments, Reserves, Settlements,
+        Bridge tables, and State History so 100% of downstream tables are derived
+        consistently from the ground-truth rules!"""
+
+        used_claims: set[str] = set()
+
+        def pick_candidates(count: int, allowed_statuses: Optional[set[str]] = None) -> List[dict]:
+            out = []
+            for c in self.claims:
+                if c["claim_id"] in used_claims:
+                    continue
+                if allowed_statuses and c["status"] not in allowed_statuses:
+                    continue
+                out.append(c)
+                if len(out) >= count:
+                    break
+            for c in out:
+                used_claims.add(c["claim_id"])
+            return out
+
+        # ── 1. EC-1 (Required): CLAIM_DATE_BEFORE_POLICY_START (10 full / 2 starter)
+        for clm in pick_candidates(self._edge_target(10), {"UNDER_REVIEW", "APPROVED"}):
+            pol = self._pol[clm["policy_id"]]
+            inc = self._inc[clm["incident_id"]]
             p_start = datetime.strptime(pol["effective_date"], "%Y-%m-%d")
-            early = p_start - timedelta(days=random.randint(30, 365))
-            inc = self._clone_incident_for_claim(clm, inc, early.strftime("%Y-%m-%d"))
+            early_dt = p_start - timedelta(days=random.randint(30, 180))
+            inc["incident_date"] = early_dt.strftime("%Y-%m-%d")
+            inc["reported_date"] = (early_dt + timedelta(days=2)).strftime("%Y-%m-%d")
+            clm["submission_date"] = (early_dt + timedelta(days=4)).strftime("%Y-%m-%d")
+            clm["created_at"] = early_dt.strftime("%Y-%m-%d 09:30:00")
             clm["status"] = "DENIED"
             clm["denial_reason"] = "CLAIM_DATE_BEFORE_POLICY_START"
-            self._record_injected_state(clm, "DENIED", clm["denial_reason"])
-            self._reflect_injected_denial(clm["claim_id"], clm["denial_reason"])
-            self.ground_truth.append(
-                {
-                    "entity_type": "CLAIM",
-                    "entity_id": clm["claim_id"],
-                    "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
-                    "expected_decision": "DENY",
-                    "description": (
-                        f"Incident date {early.strftime('%Y-%m-%d')} < "
-                        f"policy start {pol['effective_date']}"
-                    ),
-                    "related_entity_id": inc["incident_id"],
-                    "severity": "HIGH",
-                }
-            )
-            count += 1
+            for it in self._items_by_clm[clm["claim_id"]]:
+                it["approved_amount"] = 0.0
+                it["status"] = "DENIED"
+            self.ground_truth.append({
+                "entity_type": "CLAIM",
+                "entity_id": clm["claim_id"],
+                "issue_type": "CLAIM_DATE_BEFORE_POLICY_START",
+                "expected_decision": "DENY",
+                "description": f"Incident date {inc['incident_date']} occurs before policy effective_date {pol['effective_date']}",
+                "related_entity_id": inc["incident_id"],
+                "severity": "HIGH",
+            })
 
-        # ── EC-2  Policy cancelled before incident (10 cases) ─────────────────
-        count = 0
-        already_labelled = {r["entity_id"] for r in self.ground_truth if r["entity_type"] == "CLAIM"}
-        for pol in self.policies:
-            if count >= self._edge_target(10):
-                break
-            if pol["status"] != "CANCELLED" or not pol.get("cancellation_date"):
-                continue
-            coverages = self._cov_by_pol.get(pol["policy_id"], [])
-            if not coverages:
-                continue
-            clm = next((c for c in self.claims
-                        if c["claim_type"] == pol["product_type"]
-                        and c["status"] not in {"DENIED", "SETTLED", "CLOSED"}
-                        and c["claim_id"] not in already_labelled), None)
-            if clm is None:
-                continue
-            # Repoint one otherwise-unlabelled claim to a coherent cancelled policy
-            # of the same product so starter-scale runs also contain this scenario.
+        # ── 2. EC-2 (Required): POLICY_CANCELLED_BEFORE_INCIDENT (10 full / 2 starter)
+        cancelled_pols = [p for p in self.policies if p["status"] == "CANCELLED" and p.get("cancellation_date")]
+        for idx, clm in enumerate(pick_candidates(self._edge_target(10), {"UNDER_REVIEW", "APPROVED"})):
+            pol = next(
+                (p for p in cancelled_pols if p["product_type"] == clm["claim_type"]),
+                cancelled_pols[idx % len(cancelled_pols)],
+            )
+            pol["product_type"] = clm["claim_type"]
+            covs = self._cov_by_pol[pol["policy_id"]]
             clm["policy_id"] = pol["policy_id"]
             clm["customer_id"] = pol["customer_id"]
-            clm["coverage_id"] = coverages[0]["coverage_id"]
+            clm["coverage_id"] = covs[0]["coverage_id"]
+            for d in self._docs_by_clm[clm["claim_id"]]:
+                d["uploaded_by"] = pol["customer_id"]
+
             cd = datetime.strptime(pol["cancellation_date"], "%Y-%m-%d")
-            late = cd + timedelta(days=random.randint(1, 60))
-            inc = self._inc.get(clm["incident_id"])
-            if not inc:
-                continue
-            inc = self._clone_incident_for_claim(clm, inc, late.strftime("%Y-%m-%d"))
+            late_dt = cd + timedelta(days=random.randint(5, 45))
+            inc = self._inc[clm["incident_id"]]
+            inc["incident_date"] = late_dt.strftime("%Y-%m-%d")
+            inc["reported_date"] = (late_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+            clm["submission_date"] = (late_dt + timedelta(days=3)).strftime("%Y-%m-%d")
+            clm["created_at"] = clm["submission_date"] + " 10:15:00"
             clm["status"] = "DENIED"
             clm["denial_reason"] = "POLICY_CANCELLED_BEFORE_INCIDENT"
-            self._record_injected_state(clm, "DENIED", clm["denial_reason"])
-            self._reflect_injected_denial(clm["claim_id"], clm["denial_reason"])
-            new_cov = coverages[0]
-            for assessment in self.assessments:
-                if assessment["claim_id"] == clm["claim_id"]:
-                    assessment["coverage_limit"] = new_cov["coverage_limit"]
-                    assessment["deductible_applied"] = new_cov["deductible"]
-                    assessment["eligible_amount"] = min(
-                        max(0.0, _rc(assessment["assessed_amount"] - new_cov["deductible"])),
-                        new_cov["coverage_limit"],
-                    )
-            self._reflect_injected_denial(clm["claim_id"], clm["denial_reason"])
+            for it in self._items_by_clm[clm["claim_id"]]:
+                it["approved_amount"] = 0.0
+                it["status"] = "DENIED"
             self.ground_truth.append({
-                "entity_type": "CLAIM", "entity_id": clm["claim_id"],
-                "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT", "expected_decision": "DENY",
-                "description": f"Policy {pol['policy_id']} cancelled {pol['cancellation_date']}, incident {late.strftime('%Y-%m-%d')}",
-                "related_entity_id": pol["policy_id"], "severity": "HIGH",
+                "entity_type": "CLAIM",
+                "entity_id": clm["claim_id"],
+                "issue_type": "POLICY_CANCELLED_BEFORE_INCIDENT",
+                "expected_decision": "DENY",
+                "description": f"Policy {pol['policy_id']} cancelled on {pol['cancellation_date']} before incident on {inc['incident_date']}",
+                "related_entity_id": pol["policy_id"],
+                "severity": "HIGH",
             })
-            already_labelled.add(clm["claim_id"])
-            count += 1
 
-        # ── EC-3  Duplicate incident (5 cases) ───────────────────────────────
-        for i in range(min(self._edge_target(5), len(self.incidents))):
+        # ── 3. EC-3 (Required): DUPLICATE_INCIDENT (5 full / 1 starter)
+        for i in range(self._edge_target(5)):
             orig = self.incidents[i]
             dup_id = self._inc_id()
             dup = dict(orig)
             dup["incident_id"] = dup_id
             self.incidents.append(dup)
             self._inc[dup_id] = dup
-            self.ground_truth.append(
-                {
-                    "entity_type": "INCIDENT",
-                    "entity_id": dup_id,
-                    "issue_type": "DUPLICATE_INCIDENT",
-                    "expected_decision": "FLAG_DUPLICATE",
-                    "description": f"Duplicate of incident {orig['incident_id']}",
-                    "related_entity_id": orig["incident_id"],
-                    "severity": "MEDIUM",
-                }
+            self.ground_truth.append({
+                "entity_type": "INCIDENT",
+                "entity_id": dup_id,
+                "issue_type": "DUPLICATE_INCIDENT",
+                "expected_decision": "FLAG_DUPLICATE",
+                "description": f"Duplicate incident report matching {orig['incident_id']} ({orig['incident_type']} on {orig['incident_date']})",
+                "related_entity_id": orig["incident_id"],
+                "severity": "MEDIUM",
+            })
+
+        # ── 4. EC-5 (Required): MISSING_MANDATORY_DOCUMENT (10 full / 2 starter)
+        for clm in pick_candidates(self._edge_target(10), {"UNDER_REVIEW", "SUBMITTED"}):
+            docs = self._docs_by_clm[clm["claim_id"]]
+            removed = docs.pop()
+            self.documents.remove(removed)
+            clm["status"] = "PENDING_DOCUMENTS"
+            for it in self._items_by_clm[clm["claim_id"]]:
+                it["approved_amount"] = None
+                it["status"] = "PENDING"
+            self.ground_truth.append({
+                "entity_type": "CLAIM",
+                "entity_id": clm["claim_id"],
+                "issue_type": "MISSING_MANDATORY_DOCUMENT",
+                "expected_decision": "REQUEST_DOCUMENTS",
+                "description": f"Mandatory document {removed['document_type']} missing for {clm['claim_type']} claim {clm['claim_id']}",
+                "related_entity_id": removed["document_id"],
+                "severity": "MEDIUM",
+            })
+
+        # ── 5. Step-4 Scenario: POLICY_LAPSED_BEFORE_INCIDENT (15 full / 2 starter)
+        lapsed_pols = [p for p in self.policies if p["status"] == "LAPSED" and p.get("lapse_date")]
+        for idx, clm in enumerate(pick_candidates(self._edge_target(15), {"UNDER_REVIEW", "APPROVED"})):
+            pol = next(
+                (p for p in lapsed_pols if p["product_type"] == clm["claim_type"]),
+                lapsed_pols[idx % len(lapsed_pols)],
+            )
+            pol["product_type"] = clm["claim_type"]
+            covs = self._cov_by_pol[pol["policy_id"]]
+            clm["policy_id"] = pol["policy_id"]
+            clm["customer_id"] = pol["customer_id"]
+            clm["coverage_id"] = covs[0]["coverage_id"]
+            for d in self._docs_by_clm[clm["claim_id"]]:
+                d["uploaded_by"] = pol["customer_id"]
+
+            ld = datetime.strptime(pol["lapse_date"], "%Y-%m-%d")
+            late_dt = ld + timedelta(days=random.randint(5, 40))
+            inc = self._inc[clm["incident_id"]]
+            inc["incident_date"] = late_dt.strftime("%Y-%m-%d")
+            inc["reported_date"] = (late_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+            clm["submission_date"] = (late_dt + timedelta(days=2)).strftime("%Y-%m-%d")
+            clm["created_at"] = clm["submission_date"] + " 11:00:00"
+            clm["status"] = "DENIED"
+            clm["denial_reason"] = "POLICY_LAPSED_BEFORE_INCIDENT"
+            for it in self._items_by_clm[clm["claim_id"]]:
+                it["approved_amount"] = 0.0
+                it["status"] = "DENIED"
+
+        # ── 6. Step-4 Scenario: INCIDENT_EXCLUDED_BY_COVERAGE (15 full / 2 starter)
+        for clm in pick_candidates(self._edge_target(15), {"UNDER_REVIEW", "APPROVED"}):
+            cov = self._cov_by_id[clm["coverage_id"]]
+            inc = self._inc[clm["incident_id"]]
+            cur_excl = [x for x in cov["exclusions"].split(",") if x]
+            if inc["incident_type"] not in cur_excl:
+                cur_excl.append(inc["incident_type"])
+                cov["exclusions"] = ",".join(sorted(set(cur_excl)))
+            clm["status"] = "DENIED"
+            clm["denial_reason"] = "INCIDENT_EXCLUDED_BY_COVERAGE"
+            for it in self._items_by_clm[clm["claim_id"]]:
+                it["approved_amount"] = 0.0
+                it["status"] = "DENIED"
+
+        # ── 7. Step-4 Scenario: SUSPECTED_FRAUD_INDICATOR (25 full / 3 starter)
+        for idx, clm in enumerate(pick_candidates(self._edge_target(25), {"UNDER_REVIEW", "APPROVED", "SETTLED"})):
+            clm["fraud_indicator"] = True
+            clm["priority"] = "URGENT"
+            if idx % 2 == 0:
+                clm["status"] = "DENIED"
+                clm["denial_reason"] = "CONFIRMED_FRAUD_INDICATOR_SIU"
+                for it in self._items_by_clm[clm["claim_id"]]:
+                    it["approved_amount"] = 0.0
+                    it["status"] = "DENIED"
+            else:
+                clm["status"] = "SIU_INVESTIGATION"
+                clm["denial_reason"] = None
+                for it in self._items_by_clm[clm["claim_id"]]:
+                    it["approved_amount"] = None
+                    it["status"] = "PENDING"
+
+        # ── 8. Step-4 Scenario: CLAIM_AMOUNT_OVER_LIMIT (15 full / 2 starter)
+        # Claimed amount exceeds coverage_limit, so Assessment caps eligible_amount at coverage_limit!
+        for clm in pick_candidates(self._edge_target(15), {"APPROVED", "SETTLED", "CLOSED"}):
+            cov = self._cov_by_id[clm["coverage_id"]]
+            limit = float(cov["coverage_limit"])
+            items = self._items_by_clm[clm["claim_id"]]
+            target_total = _rc(limit * random.uniform(1.25, 1.60))
+            per_item = _rc(target_total / len(items))
+            new_total = 0.0
+            for it in items:
+                it["quantity"] = 1
+                it["unit_cost"] = per_item
+                it["claimed_amount"] = per_item
+                it["approved_amount"] = per_item
+                it["status"] = "APPROVED"
+                new_total = _rc(new_total + per_item)
+            clm["claim_amount"] = new_total
+
+    # ── Step 9: Assessments (100% Derived from ClaimItems & Coverage Rules) ───
+
+    def _gen_assessments(self) -> None:
+        for clm in self.claims:
+            if clm["status"] == "SUBMITTED":
+                continue
+            aid = self._asn_id(clm["claim_id"])
+            sub = datetime.strptime(clm["submission_date"], "%Y-%m-%d")
+            cov = self._cov_by_id[clm["coverage_id"]]
+            cl = float(cov["coverage_limit"])
+            ded = float(cov["deductible"])
+            copay_pct = int(cov.get("co_pay_percentage") or 0)
+
+            items = self._items_by_clm[clm["claim_id"]]
+            is_approved = clm["status"] in ("APPROVED", "SETTLED", "CLOSED")
+            is_denied = clm["status"] == "DENIED"
+
+            if is_denied:
+                assessed = 0.0
+                eligible = 0.0
+                cov_verified = False
+                liability_pct = 0
+                recommendation = "DENY"
+                notes = f"Denied ({clm['denial_reason']}): eligible amount is 0.00 USD"
+            elif is_approved:
+                assessed = _rc(sum(float(it["approved_amount"] or 0.0) for it in items))
+                liability_pct = 100
+                # Standard formula: min(max(0, assessed - deductible), coverage_limit)
+                eligible = min(max(0.0, _rc(assessed - ded)), cl)
+                cov_verified = True
+                recommendation = "APPROVE"
+                notes = (
+                    f"Verified coverage {cov['coverage_id']}; assessed={assessed:.2f}, "
+                    f"deductible={ded:.2f}, limit={cl:.2f}, eligible={eligible:.2f}"
+                )
+            else:
+                # UNDER_REVIEW, PENDING_DOCUMENTS, SIU_INVESTIGATION
+                assessed = _rc(clm["claim_amount"] * 0.90)
+                liability_pct = 100
+                eligible = min(max(0.0, _rc(assessed - ded)), cl)
+                cov_verified = True
+                recommendation = "REVIEW"
+                notes = f"Preliminary review in progress for {clm['claim_id']} ({clm['status']})"
+
+            fraud_score = (
+                round(random.uniform(0.65, 0.98), 3)
+                if clm["fraud_indicator"]
+                else round(random.uniform(0.01, 0.24), 3)
             )
 
-        # ── EC-4  Settlement exceeds coverage limit (5 cases) ─────────────────
-        count = 0
-        for sett in self.settlements:
-            if count >= self._edge_target(5):
-                break
-            # Keep the over-limit example separate from the duplicate-payment case.
-            if sett.get("status") == "PAID":
-                continue
-            clm = self._clm.get(sett["claim_id"])
-            if not clm or not clm.get("coverage_id"):
-                continue
-            for cov in self._cov_by_pol.get(clm["policy_id"], []):
-                if cov["coverage_id"] == clm["coverage_id"]:
-                    over = _rc(cov["coverage_limit"] * random.uniform(1.1, 1.5))
-                    sett["settlement_amount"] = over
-                    self.ground_truth.append(
-                        {
-                            "entity_type": "SETTLEMENT",
-                            "entity_id": sett["settlement_id"],
-                            "issue_type": "SETTLEMENT_EXCEEDS_LIMIT",
-                            "expected_decision": "CAP_TO_LIMIT",
-                            "description": (
-                                f"Settlement {over} > limit {cov['coverage_limit']}"
-                            ),
-                            "related_entity_id": cov["coverage_id"],
-                            "severity": "HIGH",
-                        }
-                    )
-                    count += 1
-                    break
+            rec = {
+                "assessment_id": aid,
+                "claim_id": clm["claim_id"],
+                "adjuster_id": clm["assigned_adjuster_id"],
+                "assessment_date": (sub + timedelta(days=random.randint(4, 15))).strftime("%Y-%m-%d"),
+                "assessed_amount": assessed,
+                "deductible_applied": ded,
+                "co_pay_percentage": copay_pct,
+                "eligible_amount": eligible,
+                "coverage_limit": cl,
+                "coverage_verified": cov_verified,
+                "liability_percentage": liability_pct,
+                "recommendation": recommendation,
+                "notes": notes,
+                "fraud_score": fraud_score,
+            }
+            self.assessments.append(rec)
+            self._asn_by_clm[clm["claim_id"]] = rec
 
-        # ── EC-5  Missing mandatory document (10 cases) ──────────────────────
-        docs_by_clm: Dict[str, List[dict]] = defaultdict(list)
-        for d in self.documents:
-            docs_by_clm[d["claim_id"]].append(d)
-        count = 0
+    # ── Step 10: Reserves (Derived from Claim & Assessment State) ─────────────
+
+    def _gen_reserves(self) -> None:
         for clm in self.claims:
-            if count >= self._edge_target(10):
-                break
-            docs = docs_by_clm.get(clm["claim_id"], [])
-            if len(docs) >= 2 and clm["status"] == "UNDER_REVIEW":
-                removed = docs[-1]
-                self.documents.remove(removed)
-                clm["status"] = "PENDING_DOCUMENTS"
-                self._record_injected_state(clm, "PENDING_DOCUMENTS", "Mandatory document missing; request evidence")
-                self.ground_truth.append(
-                    {
-                        "entity_type": "CLAIM",
-                        "entity_id": clm["claim_id"],
-                        "issue_type": "MISSING_MANDATORY_DOCUMENT",
-                        "expected_decision": "REQUEST_DOCUMENTS",
-                        "description": (
-                            f"Missing {removed['document_type']} "
-                            f"for claim {clm['claim_id']}"
-                        ),
-                        "related_entity_id": removed["document_id"],
-                        "severity": "MEDIUM",
-                    }
-                )
-                count += 1
+            if clm["status"] in ("SUBMITTED", "DENIED"):
+                continue
+            rid = self._rsv_id(clm["claim_id"])
+            sub = datetime.strptime(clm["submission_date"], "%Y-%m-%d")
+            initial_rsv = _rc(clm["claim_amount"] * random.uniform(0.85, 1.15))
+            asn = self._asn_by_clm.get(clm["claim_id"])
+            is_open = clm["status"] in ("PENDING_DOCUMENTS", "UNDER_REVIEW", "SIU_INVESTIGATION", "APPROVED")
+            current_rsv = (
+                (asn["eligible_amount"] if (asn and clm["status"] == "APPROVED") else initial_rsv)
+                if is_open
+                else 0.0
+            )
+            rec = {
+                "reserve_id": rid,
+                "claim_id": clm["claim_id"],
+                "initial_reserve": initial_rsv,
+                "current_reserve": current_rsv,
+                "reserve_type": "CASE",
+                "set_date": (sub + timedelta(days=random.randint(1, 5))).strftime("%Y-%m-%d"),
+                "last_updated": (sub + timedelta(days=random.randint(10, 35))).strftime("%Y-%m-%d"),
+                "set_by": clm["assigned_adjuster_id"],
+                "currency": "USD",
+                "status": "OPEN" if is_open else "CLOSED",
+            }
+            self.reserves.append(rec)
+            self._rsv_by_clm[clm["claim_id"]] = rec
 
-        # ── EC-6  Claim paid twice (5 cases) ──────────────────────────────────
-        count = 0
-        for sett in list(self.settlements):
-            if count >= self._edge_target(5):
+    # ── Step 11: Settlements & Remaining Settlement Edge Cases (EC-4 & EC-6) ──
+
+    def _gen_settlements_and_settlement_edge_cases(self) -> None:
+        for clm in self.claims:
+            if clm["status"] not in ("SETTLED", "CLOSED"):
+                continue
+            sid = self._set_id(clm["claim_id"])
+            sub = datetime.strptime(clm["submission_date"], "%Y-%m-%d")
+            asn = self._asn_by_clm[clm["claim_id"]]
+            s_amt = asn["eligible_amount"]
+            app_dt = sub + timedelta(days=random.randint(16, 40))
+            pay_dt = app_dt + timedelta(days=random.randint(2, 14))
+            cust = self._cust[clm["customer_id"]]
+            rec = {
+                "settlement_id": sid,
+                "claim_id": clm["claim_id"],
+                "assessment_id": asn["assessment_id"],
+                "settlement_amount": s_amt,
+                "payment_method": random.choice(["ACH", "DIRECT_DEPOSIT", "WIRE_TRANSFER", "CHECK"]),
+                "payment_date": pay_dt.strftime("%Y-%m-%d"),
+                "approved_by": clm["assigned_adjuster_id"],
+                "approved_date": app_dt.strftime("%Y-%m-%d"),
+                "status": "PAID" if clm["status"] == "CLOSED" else random.choice(["APPROVED", "PAID"]),
+                "payee_name": f"{cust['first_name']} {cust['last_name']}",
+                "payee_customer_id": clm["customer_id"],
+                "notes": f"Settlement disbursement for claim {clm['claim_id']}",
+            }
+            self.settlements.append(rec)
+            self._set_by_clm[clm["claim_id"]].append(rec)
+
+        # ── EC-4 (Required): SETTLEMENT_EXCEEDS_LIMIT (5 full / 1 starter)
+        count_ec4 = 0
+        over_limit_claims: set[str] = set()
+        for sett in self.settlements:
+            if count_ec4 >= self._edge_target(5):
                 break
-            if sett["status"] != "PAID":
+            if sett["status"] == "PAID":
+                continue
+            clm = self._clm[sett["claim_id"]]
+            cov = self._cov_by_id[clm["coverage_id"]]
+            over_amt = _rc(float(cov["coverage_limit"]) * random.uniform(1.12, 1.35))
+            sett["settlement_amount"] = over_amt
+            sett["notes"] = "ANOMALY: Settlement amount exceeds policy coverage limit"
+            over_limit_claims.add(clm["claim_id"])
+            self.ground_truth.append({
+                "entity_type": "SETTLEMENT",
+                "entity_id": sett["settlement_id"],
+                "issue_type": "SETTLEMENT_EXCEEDS_LIMIT",
+                "expected_decision": "CAP_TO_LIMIT",
+                "description": f"Settlement {over_amt:.2f} exceeds coverage_limit {cov['coverage_limit']:.2f} on {cov['coverage_id']}",
+                "related_entity_id": cov["coverage_id"],
+                "severity": "HIGH",
+            })
+            count_ec4 += 1
+
+        # Fallback if all settlements were PAID in starter mode
+        if count_ec4 < self._edge_target(5):
+            for sett in self.settlements:
+                if count_ec4 >= self._edge_target(5):
+                    break
+                if sett["claim_id"] in over_limit_claims:
+                    continue
+                clm = self._clm[sett["claim_id"]]
+                cov = self._cov_by_id[clm["coverage_id"]]
+                over_amt = _rc(float(cov["coverage_limit"]) * 1.20)
+                sett["settlement_amount"] = over_amt
+                sett["status"] = "APPROVED"
+                over_limit_claims.add(clm["claim_id"])
+                self.ground_truth.append({
+                    "entity_type": "SETTLEMENT",
+                    "entity_id": sett["settlement_id"],
+                    "issue_type": "SETTLEMENT_EXCEEDS_LIMIT",
+                    "expected_decision": "CAP_TO_LIMIT",
+                    "description": f"Settlement {over_amt:.2f} exceeds coverage_limit {cov['coverage_limit']:.2f} on {cov['coverage_id']}",
+                    "related_entity_id": cov["coverage_id"],
+                    "severity": "HIGH",
+                })
+                count_ec4 += 1
+
+        # ── EC-6 (Required): CLAIM_PAID_TWICE (5 full / 1 starter)
+        count_ec6 = 0
+        for sett in list(self.settlements):
+            if count_ec6 >= self._edge_target(5):
+                break
+            if sett["status"] != "PAID" or sett["claim_id"] in over_limit_claims:
                 continue
             dup_id = self._set_id(sett["claim_id"])
             dup = dict(sett)
             dup["settlement_id"] = dup_id
             orig_dt = datetime.strptime(sett["payment_date"], "%Y-%m-%d")
-            dup["payment_date"] = (
-                orig_dt + timedelta(days=random.randint(1, 30))
-            ).strftime("%Y-%m-%d")
+            dup["payment_date"] = (orig_dt + timedelta(days=random.randint(2, 14))).strftime("%Y-%m-%d")
+            dup["notes"] = f"Duplicate disbursement of {sett['settlement_id']}"
             self.settlements.append(dup)
-            self.ground_truth.append(
-                {
-                    "entity_type": "SETTLEMENT",
-                    "entity_id": dup_id,
-                    "issue_type": "CLAIM_PAID_TWICE",
-                    "expected_decision": "FLAG_DUPLICATE_PAYMENT",
-                    "description": (
-                        f"Duplicate payment for claim {sett['claim_id']}, "
-                        f"original {sett['settlement_id']}"
-                    ),
-                    "related_entity_id": sett["settlement_id"],
-                    "severity": "CRITICAL",
-                }
-            )
-            count += 1
+            self._set_by_clm[sett["claim_id"]].append(dup)
+            self.ground_truth.append({
+                "entity_type": "SETTLEMENT",
+                "entity_id": dup_id,
+                "issue_type": "CLAIM_PAID_TWICE",
+                "expected_decision": "FLAG_DUPLICATE_PAYMENT",
+                "description": f"Duplicate PAID settlement for claim {sett['claim_id']} (original {sett['settlement_id']})",
+                "related_entity_id": sett["settlement_id"],
+                "severity": "CRITICAL",
+            })
+            count_ec6 += 1
 
-    # ── Checksum ──────────────────────────────────────────────────────────────
+    # ── Step 12: Normalized Many-to-Many (N:M) Bridge Tables ──────────────────
 
-    def checksum(self) -> str:
-        # Hash every record so changes in middle rows are detected as well.
-        blob = {name: getattr(self, name) for name in self._table_names()}
-        return hashlib.sha256(
-            json.dumps(blob, sort_keys=True, default=str).encode()
-        ).hexdigest()
+    def _gen_bridge_tables(self) -> None:
+        """Populates the 2 normalized N:M bridge tables:
+        1. claim_adjuster_assignments (Claim <-> Adjuster N:M)
+        2. claim_coverage_allocations (Claim <-> Coverage N:M)
+        """
+        siu_adjusters = [
+            a["adjuster_id"]
+            for a in self.adjusters
+            if a["status"] == "ACTIVE" and a["role_tier"] == "SIU_SPECIALIST"
+        ] or [self.adjusters[0]["adjuster_id"]]
+
+        senior_adjusters = [
+            a["adjuster_id"]
+            for a in self.adjusters
+            if a["status"] == "ACTIVE" and a["role_tier"] == "SENIOR_ADJUSTER"
+        ] or [self.adjusters[0]["adjuster_id"]]
+
+        for clm in self.claims:
+            cid = clm["claim_id"]
+            sub_dt = clm["submission_date"]
+            # Primary adjuster assignment
+            self.claim_adjuster_assignments.append({
+                "assignment_id": self._caa_id(cid),
+                "claim_id": cid,
+                "adjuster_id": clm["assigned_adjuster_id"],
+                "assignment_role": "PRIMARY_ADJUSTER",
+                "assigned_date": sub_dt,
+                "unassigned_date": None,
+                "is_active": True,
+                "workload_weight": 1.0,
+            })
+            # If fraud_indicator or high claim amount, assign secondary SIU / Senior reviewer (N:M!)
+            if clm["fraud_indicator"]:
+                siu_id = random.choice(siu_adjusters)
+                if siu_id != clm["assigned_adjuster_id"]:
+                    self.claim_adjuster_assignments.append({
+                        "assignment_id": self._caa_id(cid),
+                        "claim_id": cid,
+                        "adjuster_id": siu_id,
+                        "assignment_role": "SIU_INVESTIGATOR",
+                        "assigned_date": sub_dt,
+                        "unassigned_date": None,
+                        "is_active": True,
+                        "workload_weight": 0.5,
+                    })
+            elif clm["claim_amount"] >= 25000.0:
+                sr_id = random.choice(senior_adjusters)
+                if sr_id != clm["assigned_adjuster_id"]:
+                    self.claim_adjuster_assignments.append({
+                        "assignment_id": self._caa_id(cid),
+                        "claim_id": cid,
+                        "adjuster_id": sr_id,
+                        "assignment_role": "SUPERVISOR_REVIEWER",
+                        "assigned_date": sub_dt,
+                        "unassigned_date": None,
+                        "is_active": True,
+                        "workload_weight": 0.25,
+                    })
+
+            # Claim <-> Coverage N:M allocation bridge
+            pol_covs = self._cov_by_pol[clm["policy_id"]]
+            primary_cov = self._cov_by_id[clm["coverage_id"]]
+            asn = self._asn_by_clm.get(cid)
+            eligible_total = float(asn["eligible_amount"]) if asn else 0.0
+
+            if len(pol_covs) >= 2 and clm["claim_amount"] >= 15000.0:
+                secondary_cov = next((c for c in pol_covs if c["coverage_id"] != primary_cov["coverage_id"]), None)
+            else:
+                secondary_cov = None
+
+            if secondary_cov:
+                p_claim = _rc(clm["claim_amount"] * 0.80)
+                s_claim = _rc(clm["claim_amount"] - p_claim)
+                p_elig = _rc(eligible_total * 0.80)
+                s_elig = _rc(eligible_total - p_elig)
+                self.claim_coverage_allocations.append({
+                    "allocation_id": self._cca_id(cid),
+                    "claim_id": cid,
+                    "coverage_id": primary_cov["coverage_id"],
+                    "is_primary": True,
+                    "allocated_claimed_amount": p_claim,
+                    "allocated_eligible_amount": p_elig,
+                    "deductible_applied": float(primary_cov["deductible"]),
+                    "effective_date": primary_cov["effective_date"],
+                    "expiration_date": primary_cov["expiration_date"],
+                })
+                self.claim_coverage_allocations.append({
+                    "allocation_id": self._cca_id(cid),
+                    "claim_id": cid,
+                    "coverage_id": secondary_cov["coverage_id"],
+                    "is_primary": False,
+                    "allocated_claimed_amount": s_claim,
+                    "allocated_eligible_amount": s_elig,
+                    "deductible_applied": 0.0,
+                    "effective_date": secondary_cov["effective_date"],
+                    "expiration_date": secondary_cov["expiration_date"],
+                })
+            else:
+                self.claim_coverage_allocations.append({
+                    "allocation_id": self._cca_id(cid),
+                    "claim_id": cid,
+                    "coverage_id": primary_cov["coverage_id"],
+                    "is_primary": True,
+                    "allocated_claimed_amount": clm["claim_amount"],
+                    "allocated_eligible_amount": eligible_total,
+                    "deductible_applied": float(primary_cov["deductible"]),
+                    "effective_date": primary_cov["effective_date"],
+                    "expiration_date": primary_cov["expiration_date"],
+                })
+
+    # ── Step 13: Claim State History & Complete Ground-Truth Decision Table ───
+
+    def _gen_state_history_and_decisions(self) -> None:
+        gt_by_entity: Dict[str, dict] = {}
+        for g in self.ground_truth:
+            gt_by_entity[g["entity_id"]] = g
+
+        for clm in self.claims:
+            cid = clm["claim_id"]
+            sub_dt = datetime.strptime(clm["submission_date"], "%Y-%m-%d") + timedelta(hours=9)
+            cur = clm["status"]
+            transitions = {
+                "SUBMITTED": [],
+                "PENDING_DOCUMENTS": ["PENDING_DOCUMENTS"],
+                "UNDER_REVIEW": ["UNDER_REVIEW"],
+                "SIU_INVESTIGATION": ["UNDER_REVIEW", "SIU_INVESTIGATION"],
+                "DENIED": (
+                    ["UNDER_REVIEW", "SIU_INVESTIGATION", "DENIED"]
+                    if clm["fraud_indicator"]
+                    else ["UNDER_REVIEW", "DENIED"]
+                ),
+                "APPROVED": ["UNDER_REVIEW", "APPROVED"],
+                "SETTLED": ["UNDER_REVIEW", "APPROVED", "SETTLED"],
+                "CLOSED": ["UNDER_REVIEW", "APPROVED", "SETTLED", "CLOSED"],
+            }
+            seq = ["SUBMITTED"] + transitions[cur]
+            ts = sub_dt
+            for i, s in enumerate(seq):
+                self.claim_state_history.append({
+                    "event_id": f"EVT-{cid}-{i+1:03d}",
+                    "claim_id": cid,
+                    "from_status": seq[i - 1] if i > 0 else None,
+                    "to_status": s,
+                    "changed_by": clm["assigned_adjuster_id"] if i > 0 else "SYSTEM",
+                    "change_reason": _state_change_reason(s, clm.get("denial_reason")),
+                    "event_timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
+                })
+                ts += timedelta(days=random.randint(2, 8), hours=random.randint(1, 6))
+            clm["updated_at"] = ts.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Build full 1,000-claim ground-truth decision record for evaluation
+            asn = self._asn_by_clm.get(cid)
+            setts = self._set_by_clm.get(cid, [])
+            anomaly_type = "NONE"
+            expected_decision = "APPROVE_AND_ROUTE_SETTLEMENT"
+            if cid in gt_by_entity:
+                anomaly_type = gt_by_entity[cid]["issue_type"]
+                expected_decision = gt_by_entity[cid]["expected_decision"]
+            elif any(s["settlement_id"] in gt_by_entity for s in setts):
+                for s in setts:
+                    if s["settlement_id"] in gt_by_entity:
+                        anomaly_type = gt_by_entity[s["settlement_id"]]["issue_type"]
+                        expected_decision = gt_by_entity[s["settlement_id"]]["expected_decision"]
+                        break
+            elif clm["status"] == "DENIED":
+                anomaly_type = clm["denial_reason"] or "COVERAGE_DENIAL"
+                expected_decision = "DENY"
+            elif clm["status"] == "SIU_INVESTIGATION":
+                anomaly_type = "SUSPECTED_FRAUD_SIU_HOLD"
+                expected_decision = "HOLD_FOR_SIU"
+
+            self.ground_truth_decisions.append({
+                "claim_id": cid,
+                "policy_id": clm["policy_id"],
+                "claim_type": clm["claim_type"],
+                "claimed_amount": clm["claim_amount"],
+                "expected_eligible_amount": asn["eligible_amount"] if asn else 0.0,
+                "expected_status": clm["status"],
+                "expected_decision": expected_decision,
+                "anomaly_or_exception_type": anomaly_type,
+                "has_fraud_indicator": clm["fraud_indicator"],
+            })
+
+    # ── Checksum & Table Inventory ────────────────────────────────────────────
 
     def _table_names(self) -> List[str]:
         return [
-            "customers", "adjusters", "policies", "coverages", "incidents",
-            "claims", "claim_items", "documents", "assessments", "reserves",
-            "settlements", "claim_state_history", "ground_truth",
+            "customers",
+            "adjusters",
+            "policies",
+            "coverages",
+            "incidents",
+            "claims",
+            "claim_items",
+            "documents",
+            "assessments",
+            "reserves",
+            "settlements",
+            "claim_adjuster_assignments",
+            "claim_coverage_allocations",
+            "claim_state_history",
+            "ground_truth",
+            "ground_truth_decisions",
         ]
 
-    # ── Export ────────────────────────────────────────────────────────────────
+    def checksum(self) -> str:
+        blob = {name: getattr(self, name) for name in self._table_names()}
+        return hashlib.sha256(
+            json.dumps(blob, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+
+    # ── Export Multi-Format Data + Zero-Leakage Feature View ──────────────────
 
     def export(self, output_dir: str) -> dict:
         csv_dir = os.path.join(output_dir, "csv")
         json_dir = os.path.join(output_dir, "json")
         sql_dir = os.path.join(output_dir, "sql")
-        for d in (csv_dir, json_dir, sql_dir):
+        feature_dir = os.path.join(output_dir, "features")
+        for d in (csv_dir, json_dir, sql_dir, feature_dir):
             os.makedirs(d, exist_ok=True)
 
-        datasets = {n: getattr(self, n) for n in self._table_names() if n != "ground_truth"}
+        entity_tables = [
+            t for t in self._table_names()
+            if t not in ("ground_truth", "ground_truth_decisions")
+        ]
         manifest: Dict[str, Any] = {
             "generator": "generate.py",
-            "generator_version": "1.1.0",
+            "generator_version": GENERATOR_VERSION,
             "python_version": platform.python_version(),
             "seed": self.seed,
             "scale": self.scale,
             "generated_at": datetime.now().isoformat(),
             "checksum": self.checksum(),
+            "provenance": {
+                "data_source": "100% Synthetic Deterministic Generation (Zero PII / Lawful Use)",
+                "external_datasets_redistributed": False,
+                "license": "MIT",
+            },
             "tables": {},
         }
 
-        for name, data in datasets.items():
+        for name in entity_tables:
+            data = getattr(self, name)
             if not data:
                 continue
-            # CSV
             cp = os.path.join(csv_dir, f"{name}.csv")
             with open(cp, "w", newline="", encoding="utf-8") as f:
                 w = csv.DictWriter(f, fieldnames=list(data[0].keys()))
                 w.writeheader()
                 w.writerows(data)
-            # JSON
+
             jp = os.path.join(json_dir, f"{name}.json")
             with open(jp, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, default=str)
-            # SQL
+
             sp = os.path.join(sql_dir, f"{name}.sql")
             self._write_sql(sp, name, data)
 
@@ -1189,53 +1487,96 @@ class InsuranceDataGenerator:
                 "sql": f"sql/{name}.sql",
             }
 
-        # Ground truth
+        # Export ground_truth.csv, ground_truth.json, and ground_truth_decisions.csv
         if self.ground_truth:
-            for ext, writer in [("csv", self._write_gt_csv), ("json", self._write_gt_json)]:
-                writer(os.path.join(output_dir, f"ground_truth.{ext}"))
+            self._write_csv_list(os.path.join(output_dir, "ground_truth.csv"), self.ground_truth)
+            with open(os.path.join(output_dir, "ground_truth.json"), "w", encoding="utf-8") as f:
+                json.dump(self.ground_truth, f, indent=2)
             manifest["ground_truth"] = {
                 "row_count": len(self.ground_truth),
                 "csv": "ground_truth.csv",
                 "json": "ground_truth.json",
             }
 
-        # Publish an explicit model-input view without post-decision outcomes.
-        # Operational claims retain status and reason; this projection does not.
-        input_exclusions = {"status", "denial_reason"}
-        feature_columns = [c for c in self.claims[0].keys() if c not in input_exclusions]
-        feature_dir = os.path.join(output_dir, "features")
-        os.makedirs(feature_dir, exist_ok=True)
+        if self.ground_truth_decisions:
+            self._write_csv_list(
+                os.path.join(output_dir, "ground_truth_decisions.csv"),
+                self.ground_truth_decisions,
+            )
+            manifest["ground_truth_decisions"] = {
+                "row_count": len(self.ground_truth_decisions),
+                "csv": "ground_truth_decisions.csv",
+            }
+
+        # Strict Zero-Leakage Feature View (excludes post-intake outcomes & fraud labels)
+        input_exclusions = {
+            "status",
+            "denial_reason",
+            "fraud_indicator",
+            "assigned_adjuster_id",
+            "updated_at",
+        }
+        base_cols = [c for c in self.claims[0].keys() if c not in input_exclusions]
+        feature_rows = []
+        for clm in self.claims:
+            pol = self._pol[clm["policy_id"]]
+            cov = self._cov_by_id[clm["coverage_id"]]
+            inc = self._inc[clm["incident_id"]]
+            docs = self._docs_by_clm[clm["claim_id"]]
+            items = self._items_by_clm[clm["claim_id"]]
+            row = {k: clm.get(k) for k in base_cols}
+            row.update({
+                "policy_status_at_intake": pol["status"],
+                "policy_effective_date": pol["effective_date"],
+                "policy_expiration_date": pol["expiration_date"],
+                "coverage_limit": cov["coverage_limit"],
+                "deductible": cov["deductible"],
+                "incident_date": inc["incident_date"],
+                "incident_severity": inc["severity"],
+                "line_item_count": len(items),
+                "submitted_document_count": len(docs),
+            })
+            feature_rows.append(row)
+
         feature_path = os.path.join(feature_dir, "claims_input.csv")
-        with open(feature_path, "w", newline="", encoding="utf-8") as stream:
-            writer = csv.DictWriter(stream, fieldnames=feature_columns)
-            writer.writeheader()
-            writer.writerows({k: row.get(k) for k in feature_columns} for row in self.claims)
+        self._write_csv_list(feature_path, feature_rows)
         manifest["claims_input_features"] = {
-            "row_count": len(self.claims), "csv": "features/claims_input.csv",
-            "excluded_outcome_fields": sorted(input_exclusions), "columns": feature_columns,
+            "row_count": len(feature_rows),
+            "csv": "features/claims_input.csv",
+            "excluded_outcome_and_label_fields": sorted(input_exclusions),
+            "columns": list(feature_rows[0].keys()),
         }
 
-        # Hash every emitted table artifact; the manifest timestamp is deliberately
-        # excluded so identical datasets produce identical table hashes.
+        # Record SHA-256 hashes of every generated file
         manifest["file_sha256"] = {}
         for folder in ("csv", "json", "sql", "features"):
             for filename in sorted(os.listdir(os.path.join(output_dir, folder))):
                 path = os.path.join(output_dir, folder, filename)
                 with open(path, "rb") as stream:
-                    manifest["file_sha256"][f"{folder}/{filename}"] = hashlib.sha256(stream.read()).hexdigest()
-        for filename in ("ground_truth.csv", "ground_truth.json"):
+                    manifest["file_sha256"][f"{folder}/{filename}"] = hashlib.sha256(
+                        stream.read()
+                    ).hexdigest()
+        for filename in ("ground_truth.csv", "ground_truth.json", "ground_truth_decisions.csv"):
             path = os.path.join(output_dir, filename)
             if os.path.exists(path):
                 with open(path, "rb") as stream:
                     manifest["file_sha256"][filename] = hashlib.sha256(stream.read()).hexdigest()
 
-        # Manifest
         with open(os.path.join(output_dir, "manifest.json"), "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
 
         return manifest
 
-    def _write_sql(self, path: str, table: str, data: list):
+    @staticmethod
+    def _write_csv_list(path: str, rows: List[dict]) -> None:
+        if not rows:
+            return
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows)
+
+    def _write_sql(self, path: str, table: str, data: list) -> None:
         with open(path, "w", encoding="utf-8") as f:
             f.write(f"-- Seed data for {table} (seed={self.seed}, scale={self.scale})\n\n")
             if not data:
@@ -1248,7 +1589,7 @@ class InsuranceDataGenerator:
                     if v is None:
                         vals.append("NULL")
                     elif isinstance(v, bool):
-                        vals.append("TRUE" if v else "FALSE")
+                        vals.append("1" if v else "0")
                     elif isinstance(v, (int, float)):
                         vals.append(str(v))
                     else:
@@ -1257,32 +1598,23 @@ class InsuranceDataGenerator:
                     f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(vals)});\n"
                 )
 
-    def _write_gt_csv(self, path: str):
-        with open(path, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=list(self.ground_truth[0].keys()))
-            w.writeheader()
-            w.writerows(self.ground_truth)
-
-    def _write_gt_json(self, path: str):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.ground_truth, f, indent=2)
-
-    # ── Main pipeline ─────────────────────────────────────────────────────────
+    # ── Main Pipeline ─────────────────────────────────────────────────────────
 
     def generate_all(self) -> str:
         steps = [
-            ("Generating customers",    self._gen_customers,    "customers"),
-            ("Generating adjusters",    self._gen_adjusters,    "adjusters"),
-            ("Generating policies",     self._gen_policies,     "policies"),
-            ("Generating coverages",    self._gen_coverages,    "coverages"),
-            ("Generating incidents",    self._gen_incidents,    "incidents"),
-            ("Generating claims",       self._gen_claims,       "claims"),
-            ("Generating claim items",  self._gen_claim_items,  "claim_items"),
-            ("Generating documents",    self._gen_documents,    "documents"),
-            ("Generating assessments",  self._gen_assessments,  "assessments"),
-            ("Generating reserves",     self._gen_reserves,     "reserves"),
-            ("Generating settlements",  self._gen_settlements,  "settlements"),
-            ("Injecting edge cases",    self._inject_edge_cases, "ground_truth"),
+            ("Generating customers",                 self._gen_customers,                               "customers"),
+            ("Generating adjusters",                 self._gen_adjusters,                               "adjusters"),
+            ("Generating policies",                  self._gen_policies,                                "policies"),
+            ("Generating coverages",                 self._gen_coverages,                               "coverages"),
+            ("Generating incidents & baseline claims", self._gen_incidents_and_claims,                  "claims"),
+            ("Generating items & deriving totals",   self._gen_claim_items_and_derive_totals,           "claim_items"),
+            ("Generating mandatory documents",       self._gen_documents,                               "documents"),
+            ("Injecting edge cases & scenarios",     self._inject_all_scenarios_before_downstream_derivation, "ground_truth"),
+            ("Deriving eligibility assessments",     self._gen_assessments,                             "assessments"),
+            ("Deriving financial reserves",          self._gen_reserves,                                "reserves"),
+            ("Deriving settlements & over/dup cases", self._gen_settlements_and_settlement_edge_cases,  "settlements"),
+            ("Building N:M bridge tables",           self._gen_bridge_tables,                           "claim_adjuster_assignments"),
+            ("Building audit history & GT decisions", self._gen_state_history_and_decisions,            "claim_state_history"),
         ]
         for i, (label, fn, attr) in enumerate(steps, 1):
             print(f"  Step {i:2d}: {label}...")
@@ -1294,13 +1626,9 @@ class InsuranceDataGenerator:
         return cs
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CLI
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Insurance Claims Synthetic Data Generator"
+        description="Insurance Claims Synthetic Data Generator (Advanced v2.0)"
     )
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--scale", choices=["starter", "full"], default="full")
@@ -1308,12 +1636,12 @@ def main():
     ap.add_argument(
         "--verify",
         action="store_true",
-        help="Run two generations and compare checksums",
+        help="Run two independent generations and compare SHA-256 checksums",
     )
     args = ap.parse_args()
 
     if args.verify:
-        print("=== Reproducibility Verification ===\n")
+        print("=== Reproducibility Verification (Two Independent Runs) ===\n")
         sums = []
         for run in (1, 2):
             print(f"--- Run {run} ---")
@@ -1324,10 +1652,10 @@ def main():
         sym = "PASS" if match else "FAIL"
         print(f"  Run-1 checksum: {sums[0]}")
         print(f"  Run-2 checksum: {sums[1]}")
-        print(f"  Result: {sym} — {'checksums match' if match else 'MISMATCH'}")
+        print(f"  Result: {sym} — {'checksums match identically' if match else 'MISMATCH'}")
         sys.exit(0 if match else 1)
 
-    print(f"=== Insurance Claims Data Generator ===")
+    print("=== Insurance Claims Data Generator (v2.0) ===")
     print(f"    Seed : {args.seed}")
     print(f"    Scale: {args.scale}\n")
 
@@ -1339,10 +1667,12 @@ def main():
 
     print("\n=== Export Summary ===")
     for t, info in manifest.get("tables", {}).items():
-        print(f"  {t:25s} {info['row_count']:>6,d} rows")
+        print(f"  {t:30s} {info['row_count']:>6,d} rows")
     if "ground_truth" in manifest:
-        print(f"  {'ground_truth':25s} {manifest['ground_truth']['row_count']:>6,d} anomalies")
-    print(f"\n  Done!")
+        print(f"  {'ground_truth':30s} {manifest['ground_truth']['row_count']:>6,d} anomalies")
+    if "ground_truth_decisions" in manifest:
+        print(f"  {'ground_truth_decisions':30s} {manifest['ground_truth_decisions']['row_count']:>6,d} claim labels")
+    print("\n  Done!")
 
 
 if __name__ == "__main__":

@@ -1,11 +1,16 @@
 {
   "generator": "generate.py",
-  "generator_version": "1.1.0",
-  "python_version": "3.12.14",
+  "generator_version": "2.0.0",
+  "python_version": "3.11.2",
   "seed": 20261022,
   "scale": "full",
-  "generated_at": "2026-11-01T21:35:01.506805",
-  "checksum": "b86c8da328dd8396ff0d683d2f7049aa01a346c0e5523f5830f6f83d5b0fb467",
+  "generated_at": "2026-11-01T17:01:30.669298",
+  "checksum": "a4a9ada70bbee7ead5781fe2f0b5a4ee0ec5b1e91b5d4c580e4d1f9149082e0a",
+  "provenance": {
+    "data_source": "100% Synthetic Deterministic Generation (Zero PII / Lawful Use)",
+    "external_datasets_redistributed": false,
+    "license": "MIT"
+  },
   "tables": {
     "customers": {
       "row_count": 1500,
@@ -20,6 +25,7 @@
         "city",
         "state",
         "zip_code",
+        "risk_tier",
         "created_at",
         "status"
       ],
@@ -36,6 +42,7 @@
         "email",
         "phone",
         "specializations",
+        "role_tier",
         "license_number",
         "hire_date",
         "status",
@@ -69,7 +76,7 @@
       "sql": "sql/policies.sql"
     },
     "coverages": {
-      "row_count": 6041,
+      "row_count": 5965,
       "columns": [
         "coverage_id",
         "policy_id",
@@ -87,7 +94,7 @@
       "sql": "sql/coverages.sql"
     },
     "incidents": {
-      "row_count": 1175,
+      "row_count": 1125,
       "columns": [
         "incident_id",
         "incident_type",
@@ -130,7 +137,7 @@
       "sql": "sql/claims.sql"
     },
     "claim_items": {
-      "row_count": 3036,
+      "row_count": 2984,
       "columns": [
         "claim_item_id",
         "claim_id",
@@ -165,7 +172,7 @@
       "sql": "sql/documents.sql"
     },
     "assessments": {
-      "row_count": 951,
+      "row_count": 925,
       "columns": [
         "assessment_id",
         "claim_id",
@@ -173,6 +180,7 @@
         "assessment_date",
         "assessed_amount",
         "deductible_applied",
+        "co_pay_percentage",
         "eligible_amount",
         "coverage_limit",
         "coverage_verified",
@@ -186,7 +194,7 @@
       "sql": "sql/assessments.sql"
     },
     "reserves": {
-      "row_count": 420,
+      "row_count": 862,
       "columns": [
         "reserve_id",
         "claim_id",
@@ -204,7 +212,7 @@
       "sql": "sql/reserves.sql"
     },
     "settlements": {
-      "row_count": 246,
+      "row_count": 564,
       "columns": [
         "settlement_id",
         "claim_id",
@@ -223,8 +231,41 @@
       "json": "json/settlements.json",
       "sql": "sql/settlements.sql"
     },
+    "claim_adjuster_assignments": {
+      "row_count": 1140,
+      "columns": [
+        "assignment_id",
+        "claim_id",
+        "adjuster_id",
+        "assignment_role",
+        "assigned_date",
+        "unassigned_date",
+        "is_active",
+        "workload_weight"
+      ],
+      "csv": "csv/claim_adjuster_assignments.csv",
+      "json": "json/claim_adjuster_assignments.json",
+      "sql": "sql/claim_adjuster_assignments.sql"
+    },
+    "claim_coverage_allocations": {
+      "row_count": 1237,
+      "columns": [
+        "allocation_id",
+        "claim_id",
+        "coverage_id",
+        "is_primary",
+        "allocated_claimed_amount",
+        "allocated_eligible_amount",
+        "deductible_applied",
+        "effective_date",
+        "expiration_date"
+      ],
+      "csv": "csv/claim_coverage_allocations.csv",
+      "json": "json/claim_coverage_allocations.json",
+      "sql": "sql/claim_coverage_allocations.sql"
+    },
     "claim_state_history": {
-      "row_count": 3195,
+      "row_count": 3555,
       "columns": [
         "event_id",
         "claim_id",
@@ -244,12 +285,19 @@
     "csv": "ground_truth.csv",
     "json": "ground_truth.json"
   },
+  "ground_truth_decisions": {
+    "row_count": 1000,
+    "csv": "ground_truth_decisions.csv"
+  },
   "claims_input_features": {
     "row_count": 1000,
     "csv": "features/claims_input.csv",
-    "excluded_outcome_fields": [
+    "excluded_outcome_and_label_fields": [
+      "assigned_adjuster_id",
       "denial_reason",
-      "status"
+      "fraud_indicator",
+      "status",
+      "updated_at"
     ],
     "columns": [
       "claim_id",
@@ -259,53 +307,66 @@
       "claim_type",
       "claim_amount",
       "submission_date",
-      "assigned_adjuster_id",
       "priority",
-      "fraud_indicator",
       "coverage_id",
       "created_at",
-      "updated_at"
+      "policy_status_at_intake",
+      "policy_effective_date",
+      "policy_expiration_date",
+      "coverage_limit",
+      "deductible",
+      "incident_date",
+      "incident_severity",
+      "line_item_count",
+      "submitted_document_count"
     ]
   },
   "file_sha256": {
-    "csv/adjusters.csv": "3e0d39d88ced397600264fb55fcbf4c47256812422e36687fb54799e094c239e",
-    "csv/assessments.csv": "42af214ec1d7140a3a96435159c496d0d17b23db1d61f15a87348aa1ac61946b",
-    "csv/claim_items.csv": "e052cdf61523726d4a3ee07189e4753cdc32a28ba7244e78d859eb5b2650d532",
-    "csv/claim_state_history.csv": "d036dd9f62d0a2a3b8021396d164557e2b40b808adfcb05aa6aba6a190599872",
-    "csv/claims.csv": "10c3e9d4f82539ba607e889f8abb8290c11b7384ae94fe7b0c87f3ba6a99c862",
-    "csv/coverages.csv": "d31a745c860b3be459656e2bf161753e5a7b060d93cba8997912dc6ddda99aa1",
-    "csv/customers.csv": "51b89eb37a2bad1aa6da9a1937daa7dce70393f10d090ada99067e8a086e0134",
-    "csv/documents.csv": "0bc9ca9e8a7f139100d967dbb9ccc02055bf3d6d90863bd71e7f76fa021d1e20",
-    "csv/incidents.csv": "106590c473f62a81f91845a6456e2db5c24bf2991a06cef905bca94d09ff67ca",
-    "csv/policies.csv": "09ab35e6e7c523eeb0328c1e144dc4977bb3199e4d6cdfb2247fbaa5746e19a3",
-    "csv/reserves.csv": "47d012a909eeacc1747caac21f34183c0e76080a60e2eb7b84293e015be718b9",
-    "csv/settlements.csv": "2db00850dfe61dfe2313aecb8c28184883ca9469a4391188eb3117a630fcac31",
-    "json/adjusters.json": "14fe6d347ad346d4a4664a545a5440dd2d8e6eedd1c2a0f2073f9f4613c39528",
-    "json/assessments.json": "5a1bd34648b5976d06ab1c6ce6f955194670007c0922de548a0825ae8634354d",
-    "json/claim_items.json": "03e35f967306e6dc26f12389b7d55b284b459ddeab6382cc0dbabfc021baa8fd",
-    "json/claim_state_history.json": "94afc073636a7123c99e81cf1538680e474e5667b147f9ad5c99c3592bfa918f",
-    "json/claims.json": "79f2e05f52689efec033fee387e9f2cc02bcb3f0c3db9820eda0eccca6685cb6",
-    "json/coverages.json": "f4b5dcd70ff76c63b23d5b48f224505141b227045e7a580c76941da18669607b",
-    "json/customers.json": "f90154780eeb8bf0b2c3df371ef2986de4288676ae0dcdd19e16021927fdea0b",
-    "json/documents.json": "2f20ce63276227468f43bbdbc183bbd4c2c7bf5a174f079075d090ee9cf68059",
-    "json/incidents.json": "f86aa04b49826f0bebd40a6110d7a12ffce4e4d521168b94efef5672405401e7",
-    "json/policies.json": "82916ea3d740812c051f55cafd79c5826fa774a1515e957138c86d0f6a44e693",
-    "json/reserves.json": "46c9fe52135789137b80c7869c8e996291cc7eeac21703662034d0fdc8c8f384",
-    "json/settlements.json": "42f9615df7befc0ad95cc0e53d16ebd34c87cf9428abbee16600c1b21404bc72",
-    "sql/adjusters.sql": "a81d4cc2dafa5fa689eba1b0bb998ee292b697fb79bf466d72508286a8d6174e",
-    "sql/assessments.sql": "49638d281500c01b93758139ef619607a269bf3d1326ff4f4bf544d97a46d289",
-    "sql/claim_items.sql": "d40f7b8c73a8ba4eb4831aeddfc2520821a0337b1605d3042a274b36fbb78e61",
-    "sql/claim_state_history.sql": "9ae778a4588dbe164a48ae0efb42a46c16fbb819883d72b08bf873e233440903",
-    "sql/claims.sql": "2885d7499a114da90c082a260d55ed58b9c325eaede57a071358366b41df4dfa",
-    "sql/coverages.sql": "0ecb1a04bdb8fd2ef92f2de80bf131d2a0c72510260982de7d6e6c9e032e6424",
-    "sql/customers.sql": "e6e8735b0ace4973640577add1299d3f95596b7ef1a829479b3ab7533bb5636b",
-    "sql/documents.sql": "96869b1c1660cde0929b1452f861fc38f42d6d59bbece54fbf02791831b9e195",
-    "sql/incidents.sql": "05d9485debc27b4d32a5870ab9462127eace4fdcec02041718a32ee5ebcac4b0",
-    "sql/policies.sql": "68cc3c0fd6856e2d6b70f7c7eb5ab42eab5e5fa6e5bf184a1f3c8c7925e59093",
-    "sql/reserves.sql": "36c7fe58c6ce286d26ffe82ae6f671667eea91510e9e3471b8dd60b2761adae5",
-    "sql/settlements.sql": "3d5f31a9aba881698bb31f6786cbb74ad1456a99c498ca13fa0858ff9762d83d",
-    "features/claims_input.csv": "c12487020e16cb39ccb55476d98fe5b2690f6698bed34a4464b5221ebe6af0bc",
-    "ground_truth.csv": "d47181ddfed6832400a95f76437138a0c0e61bb2d7705f39b4f0392ced8d1601",
-    "ground_truth.json": "f4ff412e17878e2a201bdee58c7c4833551b5a375e1b46c3feda1f43257b391a"
+    "csv/adjusters.csv": "ac761be428f54ddd3f6756d32e88b1a85b3b6d9274f41f3c4c98a8d4d529e52d",
+    "csv/assessments.csv": "38bf37d13832e4ba948e6ffd9c1b257112c22bc33e7e12f542b14a513f55b5a5",
+    "csv/claim_adjuster_assignments.csv": "0e84e0538332c98138e4a854dbd9de84ec3da9a8899ad81a4b7e805582bfb23c",
+    "csv/claim_coverage_allocations.csv": "31a84b4ec6ee68ddbb5d68c5c2b03ef3504ccb5f354c5f3a3cff86c17f602aa0",
+    "csv/claim_items.csv": "b0b4901642567543d225823c5981b9499a458457a4597fc68b8c59f7f103c0d6",
+    "csv/claim_state_history.csv": "dc21f8e2cdd93a08076a6ea1d80d9f9eee9239f4329d1f32cea4f4fca9d5485c",
+    "csv/claims.csv": "4ba9e36af0de075b8141cc0450e6c1d18966c987fa41a774aca6253ba3e59378",
+    "csv/coverages.csv": "4be7b5f940074a56c0896e2224820d07ff9e0cc5e4b3a3cfee78bace09de1a3a",
+    "csv/customers.csv": "a282180d0c374fc2da7d4c95d5420d959f825a8c12cb0ba2ece670525bf328f4",
+    "csv/documents.csv": "900c37809416f82e44f06912973c75b527b5a5bda1a67908890f66ce45e95642",
+    "csv/incidents.csv": "823701953c225d75a2a5444ec28e1686c04859345a443241236db77be204e776",
+    "csv/policies.csv": "367b1abb8e677bbffcbbcc51c5be1535f4b54f91902bd421e4e983a5ecd35bcd",
+    "csv/reserves.csv": "ae439bb8dfdc62069e934afe57b8fc5674c626777ab1724b926dfb738ba8ecb4",
+    "csv/settlements.csv": "97a3c2a1854eedaef276c3934726dcaedd03b525e3b1271904c0b8e26a455929",
+    "json/adjusters.json": "968ecf14c3c20fb6ed0f116e4246cde558f415589764f3ca05da15c6a2eda458",
+    "json/assessments.json": "abf3496156902caaf6afd2fce4684e3c1ee1ff41434d6833b7143730783e397b",
+    "json/claim_adjuster_assignments.json": "740811ebc4183c6df434d9841a35d973413329a4538f8fbf9f7b08a80ae14837",
+    "json/claim_coverage_allocations.json": "86d6bedb74fa40191ce379e7377e9965bc51808d8cfe43d1c8aa9ae9a60d5ab6",
+    "json/claim_items.json": "8d672b8f346572d914dfa7bfb5f1bfc4b2985594dfa9b3bcd3244c7a84b7b0f8",
+    "json/claim_state_history.json": "6600195086bffbf7d9f71bd29b2c0608c93f8cf40509029c2e63a4f931c0904e",
+    "json/claims.json": "2321994219e7cc21a5fa2a78b2713570ecd48bfccaaf706f761ac747cf8a50ce",
+    "json/coverages.json": "cdbd6bd13169cb691946564b36a54f5634d5913ac6be4e084be647796ed70306",
+    "json/customers.json": "066b2efd5bfb709d1a3a757b305b5921a40c1f0d0f000c1bb9ee0da11f9b78b5",
+    "json/documents.json": "d1dd220d29f0be2c596f747cbe03349743b3a5e610196800da98d29c3b11ea63",
+    "json/incidents.json": "968203818e2211b34efc09409ed696d823f1ab84d476911b613e413bd15bd3b0",
+    "json/policies.json": "c895076da4994ef8ea5f318657b2764d0d7162561037430709b5fc47786eadd9",
+    "json/reserves.json": "db58880e64abc6204bf30d4286c5e1d6e281f0943a203d10ce6aade784e8a7f8",
+    "json/settlements.json": "557bf0187b8902f9c1b1a6e0ce294295fc8e3db1260aa8e64b7fa7afa5c84beb",
+    "sql/adjusters.sql": "bfe4c8275e5408e7f4b600fd983d614a36e0e48059e965dad4814f04308f9f75",
+    "sql/assessments.sql": "f349393ac9ba2d81dfd6a2ab5799a5e02bbecc6dc76b61dc6fdeab4d2b1777de",
+    "sql/claim_adjuster_assignments.sql": "654bd623fd40fc945f8faadbbf6cfc21a1d01a7d2346e1406e6760810776708b",
+    "sql/claim_coverage_allocations.sql": "ad8153fbc9879be8a91132624dbff48df002a2b302b78c99bcfccaba6686a0bb",
+    "sql/claim_items.sql": "6b966ddcf52456b7194cd882a74c9f24d0d98627fac2c91e1705a9b80c3d1e8e",
+    "sql/claim_state_history.sql": "c42f442af6326e964f6113896aeafa8d4c7967a985f392a50f847260744f1a7e",
+    "sql/claims.sql": "e124e7e89341c5c0c68620b15223e471544a2cac5fd91eedad6171e763dda8ff",
+    "sql/coverages.sql": "6569cd515b8653b703d2506e537b5315b97c01afca9bff8c77e3650b5ad37850",
+    "sql/customers.sql": "c9b19fb1e5ff90ada455cb17e67ffedccd8f691353ccccbf20bcb62e4e4e9f9c",
+    "sql/documents.sql": "18e3a7e85c82dc0a3e0b261880d0456874338f20da43eee1d2ab7d968c27da3a",
+    "sql/incidents.sql": "92a850e329b7530fcac4907b700ea50ed1a7591eba5e3ee995bdec0f83a92d49",
+    "sql/policies.sql": "dc7114dbec19cfcd2ac19b9dc2892e0da092a91753565806400fc92cb2b13461",
+    "sql/reserves.sql": "e64a20f591143da6aa77eb1fbc8e39d6429e8f520c19da4850e69f3eb0cb1007",
+    "sql/settlements.sql": "4e56709dec81cba3ce8a3f754b7161fbab64d64624fd58a34f00798134fff236",
+    "features/claims_input.csv": "8e22e446bb578552671ebe15bfc01d5198343d80cc8870f0acb4531bdbeff5cd",
+    "ground_truth.csv": "c88bc0e3afecd8be4b6b1227c1b6be557a859193f8eaf4adb9eb1bb8ed9e1f4b",
+    "ground_truth.json": "c86858422a56691ab6a002b7b2781023bcc8c12abc11771380c1291a0b85c583",
+    "ground_truth_decisions.csv": "70385a0fb4a725233115c684d6d68f888217e4a83371f3945f94bc73d4f632d6"
   }
 }

@@ -2,6 +2,12 @@
   "dataset": {
     "claims": 1000,
     "policies": 2000,
+    "customers": 1500,
+    "adjusters": 50,
+    "claim_items": 2984,
+    "documents": 3990,
+    "claim_adjuster_assignments_bridge": 1140,
+    "claim_coverage_allocations_bridge": 1237,
     "claim_types": {
       "AUTO": 300,
       "HEALTH": 250,
@@ -11,20 +17,39 @@
     }
   },
   "claim_outcomes": {
-    "APPROVED": 87,
-    "CLOSED": 101,
-    "DENIED": 551,
+    "APPROVED": 159,
+    "CLOSED": 265,
+    "DENIED": 63,
     "PENDING_DOCUMENTS": 10,
-    "SETTLED": 140,
-    "SUBMITTED": 47,
-    "UNDER_REVIEW": 64
+    "SETTLED": 294,
+    "SIU_INVESTIGATION": 12,
+    "SUBMITTED": 75,
+    "UNDER_REVIEW": 122
   },
-  "approval_rate": 0.328,
-  "coverage_failure_rate": 0.541,
-  "required_document_completeness_rate": 0.676,
+  "denial_reason_breakdown": {
+    "CLAIM_DATE_BEFORE_POLICY_START": 10,
+    "CONFIRMED_FRAUD_INDICATOR_SIU": 13,
+    "INCIDENT_EXCLUDED_BY_COVERAGE": 15,
+    "POLICY_CANCELLED_BEFORE_INCIDENT": 10,
+    "POLICY_LAPSED_BEFORE_INCIDENT": 15
+  },
+  "approval_rate": 0.718,
+  "coverage_failure_rate": 0.05,
+  "required_document_completeness_rate": 0.99,
+  "line_item_unit_cost_reconciliation_rate": 1.0,
+  "claim_total_to_items_reconciliation_rate": 1.0,
   "reserve_within_80_120_percent_rate": 1.0,
   "settlement_within_coverage_limit_rate_excluding_labelled_over_limit_cases": 1.0,
-  "mean_days_submission_to_payment": 53.76,
+  "financial_summary_usd": {
+    "total_claimed_usd": 19374177.85,
+    "total_eligible_usd": 14787341.26,
+    "total_paid_settlements_usd": 10140648.98
+  },
+  "cycle_time_days": {
+    "mean_days_submission_to_payment": 35.81,
+    "median_p50_days": 36,
+    "p90_days": 46
+  },
   "known_edge_case_counts": {
     "CLAIM_DATE_BEFORE_POLICY_START": 10,
     "CLAIM_PAID_TWICE": 5,
@@ -33,8 +58,16 @@
     "POLICY_CANCELLED_BEFORE_INCIDENT": 10,
     "SETTLEMENT_EXCEEDS_LIMIT": 5
   },
+  "ground_truth_decision_distribution": {
+    "APPROVE_AND_ROUTE_SETTLEMENT": 905,
+    "CAP_TO_LIMIT": 5,
+    "DENY": 63,
+    "FLAG_DUPLICATE_PAYMENT": 5,
+    "HOLD_FOR_SIU": 12,
+    "REQUEST_DOCUMENTS": 10
+  },
   "notes": [
-    "Metrics are descriptive of this synthetic dataset, not estimates of real insurer performance.",
+    "All monetary figures and totals are 100% bottom-up derived from line items and coverage rules.",
     "Intentional SETTLEMENT_EXCEEDS_LIMIT labels are excluded from normal settlement-limit compliance."
   ]
 }

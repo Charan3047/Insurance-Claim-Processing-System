@@ -1,178 +1,68 @@
-# Insurance Claims Processing Demo
+# Insurance Claims Processor — Advanced Edition (v2.0)
 
-A small, runnable claims workflow and deterministic synthetic-data pipeline. The project demonstrates claim intake, coverage checks, evidence collection, eligibility assessment, adjuster assignment, approval, payment, and an auditable event history.
+An end-to-end, zero-dependency insurance claims adjudication workflow, 14-table relational model (with normalized N:M bridge tables), deterministic bottom-up synthetic data generator (`seed=20261022`), 114-check validation suite, and interactive browser workbench.
 
-> **Scope:** This is a local challenge prototype using synthetic data. It is not a production insurance or adjudication system, and its generated metrics do not describe real insurer performance.
+## Key Advancements over Baseline (v1.0 → v2.0)
 
-## At a glance
+1. **100% Bottom-Up Derived Financial Reconciliation (Zero Tolerance)**:
+   - Every `ClaimItem` computes `claimed_amount = round(quantity * unit_cost, 2)` exactly (`100%` match vs. `60.7%` in v1.0).
+   - Every `Claim` derives `claim_amount = round(sum(claim_items.claimed_amount), 2)` from its child line items (`100%` match vs. `0%` in v1.0).
+   - Every approved `Assessment` derives `assessed_amount = round(sum(claim_items.approved_amount), 2)` (`100%` match vs. `0%` in v1.0) and sets `eligible_amount = 0.00` whenever a claim is denied (`100%` match vs. `1.3%` in v1.0).
+2. **Normalized Many-to-Many (N:M) Bridge Tables**:
+   - Adds `claim_adjuster_assignments` (`CAA-<claim_id>-NNN`) modeling multi-role adjuster assignments (`PRIMARY_ADJUSTER`, `SIU_INVESTIGATOR`, `SUPERVISOR_REVIEWER`, `CO_ADJUSTER`).
+   - Adds `claim_coverage_allocations` (`CCA-<claim_id>-NNN`) modeling multi-coverage financial splits whose `allocated_claimed_amount` sums exactly to `claims.claim_amount`.
+3. **Clean Baseline + Bi-Directionally Verified Edge Cases**:
+   - Generates coherent baseline claims first, then injects all **6 required negative edge cases** (`CLAIM_DATE_BEFORE_POLICY_START`, `POLICY_CANCELLED_BEFORE_INCIDENT`, `DUPLICATE_INCIDENT`, `SETTLEMENT_EXCEEDS_LIMIT`, `MISSING_MANDATORY_DOCUMENT`, `CLAIM_PAID_TWICE`) plus **4 Step-4 portfolio exception scenarios** (`POLICY_LAPSED_BEFORE_INCIDENT`, `INCIDENT_EXCLUDED_BY_COVERAGE`, `CONFIRMED_FRAUD_INDICATOR_SIU` / `SIU_INVESTIGATION`, `CLAIM_AMOUNT_OVER_LIMIT`).
+   - Eliminates the 283 unlabelled accidental date/cancellation anomalies and 99 approved-with-rejected-documents anomalies present in v1.0.
+4. **Strict Zero-Leakage Feature Separation & Full Portfolio Decision Labels**:
+   - Removes `fraud_indicator`, `assigned_adjuster_id`, and `updated_at` from `output/features/claims_input.csv` so no ground-truth label or post-intake outcome leaks into model features.
+   - Publishes `output/ground_truth_decisions.csv` covering all 1,000 claims alongside `output/ground_truth.csv` and `output/ground_truth.json`.
+5. **Unified 14-Table SQLite Live Workbench (`workflow.py` & `app.py`)**:
+   - Seeds all 14 CSV tables into `workflow.sqlite` on startup so live metrics immediately reflect all 1,000 claims, 564 settlements, 1,140 N:M adjuster links, 1,237 N:M coverage links, and 3,555 audit events.
+   - Adds queue filtering by status and product type, a Claim 360° inspector with line-item waterfall, and an `/api/claims/{id}/siu` fraud escalation route.
 
-- Browser-based claims workflow with role-aware actions and a JSON API.
-- Python standard library only; no third-party packages required.
-- Reproducible full dataset: 2,000 policies and 1,000 claims across five product types.
-- CSV, JSON, and SQL data exports, a separate feature projection, and separate ground-truth labels.
-- Validation, metrics, automated tests, and GitHub Actions checks.
-- AI assistance and design assumptions are disclosed in the project documentation.
+## Quick Start
 
-## Run locally
-
-Requires Python 3.10 or newer. From the project directory:
+Requires Python 3.10+ (standard library only, zero external dependencies):
 
 ```bash
-# Start the browser workflow, then open http://127.0.0.1:8000
-python app.py
+# 1. Generate the default full dataset (2,000 policies / 1,000 claims, seed 20261022)
+python3 generate.py
+
+# 2. Or generate the starter dataset (200 policies / 100 claims)
+python3 generate.py --scale starter
+
+# 3. Verify two-run deterministic SHA-256 reproducibility
+python3 generate.py --verify
+
+# 4. Run the 12-section (114-check) validation suite
+python3 validate.py --json-report output/validation_report.json
+
+# 5. Compute portfolio, reconciliation, and cycle-time metrics
+python3 metrics.py --data-dir output --output output/metrics.json
+
+# 6. Run the automated test suite (13 tests)
+python3 -m unittest discover -v
+
+# 7. Launch the interactive browser workbench at http://127.0.0.1:8000
+python3 app.py
 ```
 
-The first run creates `workflow.sqlite` for the demo's mutable workflow state and event history. The generated reference data is read from `output/`.
+## Repository Structure
 
-To run the data and quality checks:
-
-```bash
-# Generate the default full dataset (2,000 policies / 1,000 claims)
-python generate.py
-
-# Or generate the smaller dataset, which still includes all six edge-case classes
-python generate.py --scale starter
-
-# Check the current dataset and write a machine-readable report
-python validate.py --json-report output/validation_report.json
-
-# Run tests
-python -m unittest discover -v
-
-# Recompute descriptive measures
-python metrics.py --data-dir output --output output/metrics.json
-
-# Generate twice in memory and compare deterministic checksums
-python generate.py --verify
-```
-
-The default generator seed is `20261022`; pass `--seed <integer>` to use another seed. Generation uses the Python standard library and needs no dependency installation.
-
-## Claims workflow
-
-The browser interface demonstrates the following lifecycle:
-
-1. A business requester submits and tracks a claim.
-2. An operations analyst requests and receives required evidence, assigns an eligible adjuster, and assesses the claim.
-3. An approver approves or rejects the recommendation.
-4. An administrator records payment for an approved settlement.
-5. A process owner reviews claim history and queue metrics.
-
-| Role | Example actions |
+| Path | Description |
 |---|---|
-| Business requester | Submit a claim, check its status, provide requested documents |
-| Operations analyst | Request evidence, receive documents, assign an adjuster, assess eligibility |
-| Approver | Approve or reject an assessed recommendation |
-| Process owner | Review queue metrics and claim history |
-| System administrator | Perform administrative actions and inspect rule configuration |
+| `generate.py` | Deterministic 14-table synthetic data generator (`seed=20261022`) |
+| `validate.py` | 12-section, 114-rule data & business-logic validator |
+| `workflow.py` | Unified 14-table SQLite workflow service and role-checked state machine |
+| `app.py` | Interactive browser workbench and JSON REST API |
+| `metrics.py` | Portfolio, financial reconciliation, and ground-truth evaluation metrics |
+| `data_dictionary.md`, `schema/` | Complete 14-table data dictionary (Markdown + JSON) and SQLite DDL (`schema.sql`) |
+| `COMPARISON_REPORT.md` | Side-by-side audit comparing Baseline v1.0 vs. Advanced v2.0 |
+| `VALIDATION_SUMMARY.md` | Summary of all 114 validation checks and reproducibility hashes |
+| `output/` | Generated CSV, JSON, SQL seed files, `features/claims_input.csv`, `ground_truth.*`, `manifest.json` |
+| `tests/` | Automated unit & integration tests (`test_app.py`, `test_pipeline.py`, `test_workflow.py`) |
 
-Actions are checked by the workflow service and recorded as timestamped events with the actor, reason, action payload, and before/after state. The browser uses the same JSON API described in [`workflow.py`](workflow.py).
+## License & Provenance
 
-### Decision rules
-
-- Coverage is invalid when the incident is outside policy or coverage dates, the policy is cancelled or lapsed before the incident, no active coverage applies, or an exclusion applies.
-- Required evidence depends on claim type. Assessment is blocked while requested evidence is outstanding.
-- Assigned adjusters must be active and specialized for the claim type.
-- The simplified recommendation is `max(0, min(claim_amount - deductible, coverage_limit))` when the claim is eligible; otherwise the eligible amount is zero.
-- The demo workflow sets a preliminary reserve to the reported claim amount. Generated reserves vary from 80% to 120% of the claim amount for evaluation.
-- Approval or rejection is allowed after assessment. Payment is recorded only for an approved settlement and is capped by the assessment and applicable coverage limit.
-- Decisions include a reason and an event-history entry.
-
-These rules simplify real insurance processes. Aggregate remaining limits, multi-policy coordination, jurisdiction-specific rules, and production identity controls are outside the project scope.
-
-### JSON API
-
-Workflow actions use `X-Role` and `X-Actor` headers. Main routes include:
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/api/claims` | List the claims queue |
-| `GET` | `/api/claims/{claim_id}` | Read claim, evidence, assessment, settlement, and event history |
-| `GET` | `/api/metrics` | Read live operational measures |
-| `GET` | `/api/rules` | Read decision rules and required evidence |
-| `GET` | `/api/reference` | Read policy and incident choices for intake |
-| `POST` | `/api/claims` | Submit a claim |
-| `POST` | `/api/claims/{id}/documents/request` | Record an evidence request |
-| `POST` | `/api/claims/{id}/documents/receive` | Record received evidence |
-| `POST` | `/api/claims/{id}/assign` | Assign an active specialist adjuster |
-| `POST` | `/api/claims/{id}/assess` | Assess eligibility and create an assessment/reserve |
-| `POST` | `/api/claims/{id}/approve` | Approve or reject the recommendation |
-| `POST` | `/api/claims/{id}/pay` | Record payment after approval |
-
-## Data model and generated data
-
-The relational model includes the 11 challenge entities—Customer, Policy, Coverage, Claim, ClaimItem, Document, Incident, Adjuster, Assessment, Reserve, and Settlement—plus claim-state history for traceability. Keys, relationships, cardinalities, optional references, field definitions, ID patterns, effective dates, and lifecycle states are documented in [`data_dictionary.md`](data_dictionary.md) and [`schema/data_dictionary.json`](schema/data_dictionary.json). SQLite DDL is in [`schema/schema.sql`](schema/schema.sql).
-
-The default full dataset contains 2,000 policies and 1,000 claims across five types:
-
-| Claim type | Claims |
-|---|---:|
-| AUTO | 300 |
-| HEALTH | 250 |
-| HOME | 200 |
-| LIFE | 100 |
-| TRAVEL | 150 |
-
-The generator creates parent/master records before dependent records and links them using generated IDs. It starts with baseline records, then injects and labels these six required edge-case classes:
-
-1. Incident before policy start
-2. Policy cancelled before incident
-3. Duplicate incident
-4. Settlement exceeds coverage limit
-5. Missing mandatory document
-6. Claim paid twice
-
-At full scale the cases have 10, 10, 5, 5, 10, and 5 examples respectively. Starter scale contains at least one example of each class. Intentional anomalies are identified in ground truth so they remain distinguishable from accidental integrity errors.
-
-## Outputs and evaluation
-
-`output/` includes:
-
-- `csv/`, `json/`, and `sql/`: exports for the generated entities and history.
-- `features/claims_input.csv`: an input-feature projection that omits post-decision outcome fields.
-- `ground_truth.csv` and `ground_truth.json`: known edge-case labels, kept separate from model-style input features.
-- `manifest.json`: seed, scale, row counts, and SHA-256 hashes for generated files.
-- `validation_report.json` and `metrics.json`: validation results and descriptive measures for the included dataset snapshot.
-
-`metrics.py` reports claim-type and outcome distributions, approval and coverage-failure rates, required-document completeness, reserve-range compliance, settlement-limit reconciliation, submission-to-payment time, and edge-case counts. These are descriptive measures of synthetic records, not estimates of real business performance.
-
-## Validation and tests
-
-The validator checks primary-key uniqueness, 19 foreign-key relationships, cross-table joins, allowed values, date ordering, financial reconciliation, lifecycle transitions, duplicate cases, ground-truth semantics, required documents, feature/label separation, and dataset volume/type coverage.
-
-The test suite covers generator behavior and workflow actions such as intake, role checks, missing-document gating, deductible/limit calculations, approval-before-payment, duplicate intake handling, event history, and metrics. The repository also includes [GitHub Actions CI](.github/workflows/ci.yml) to run tests, validate the packaged dataset, and generate metrics on pushes and pull requests.
-
-The included full-data validation snapshot reports **89 passes, 0 failures, and 2 warnings**. The warnings correspond to intentionally injected duplicate incidents and duplicate payments; those cases are represented in separate ground-truth labels.
-
-## Reproducibility
-
-The generator defaults to seed `20261022`. `python generate.py --verify` regenerates the complete dataset twice in memory and compares checksums. The output manifest records SHA-256 values for generated CSV, JSON, SQL, and feature files. Results are deterministic for a given seed and Python runtime.
-
-## Repository guide
-
-| Path | Contents |
-|---|---|
-| `app.py`, `workflow.py` | Local browser application, API, workflow rules, and SQLite persistence |
-| `generate.py` | Synthetic-data generator and reproducibility check |
-| `validate.py` | Dataset and business-rule validation |
-| `metrics.py` | Synthetic-data evaluation measures |
-| `schema/`, `data_dictionary.md` | Relational schema and field documentation |
-| `output/` | Generated data, labels, manifest, report, and metrics |
-| `tests/` | Standard-library automated test suite |
-| `.github/workflows/ci.yml` | Automated checks for GitHub pushes and pull requests |
-
-## Challenge and AI-use documentation
-
-- [`AI_USAGE.md`](AI_USAGE.md) discloses substantial AI assistance and summarizes the prompt history. It does not claim independent authorship or review that did not occur.
-- [`DESIGN_NOTES.md`](DESIGN_NOTES.md) documents assumptions, choices, trade-offs, validation, and limitations.
-- [`PRESENTATION_GUIDE.md`](PRESENTATION_GUIDE.md) provides a short walkthrough and questions to prepare for.
-
-Please describe your own contribution and AI assistance accurately when presenting or submitting this project.
-
-## Limitations
-
-This project is a local demonstration. It does not include production authentication, deployment hardening, external document storage, insurer integrations, concurrency/load testing, or jurisdiction-specific claim rules. Synthetic data and metrics are not representative of real customers, policies, or insurer performance. See [`DESIGN_NOTES.md`](DESIGN_NOTES.md) for assumptions and possible next steps.
-
-## License and data provenance
-
-The code is released under the MIT License; see [`LICENSE`](LICENSE). All generated records are synthetic. No external dataset is redistributed. The schema is informed by common insurance concepts, and generated personal-looking fields must not be treated as real customer or policy information.
+Released under the MIT License (`LICENSE`). All records are 100% synthetic and deterministically generated; no external personal or proprietary insurer data is used or redistributed.

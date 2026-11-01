@@ -1,8 +1,8 @@
 {
   "overall": "PASS",
-  "pass": 89,
+  "pass": 114,
   "fail": 0,
-  "warn": 2,
+  "warn": 0,
   "checks": [
     {
       "status": "PASS",
@@ -22,12 +22,12 @@
     {
       "status": "PASS",
       "rule": "PK_UNIQUE_COVERAGES",
-      "detail": "6041 unique keys"
+      "detail": "5965 unique keys"
     },
     {
       "status": "PASS",
       "rule": "PK_UNIQUE_INCIDENTS",
-      "detail": "1175 unique keys"
+      "detail": "1125 unique keys"
     },
     {
       "status": "PASS",
@@ -37,7 +37,7 @@
     {
       "status": "PASS",
       "rule": "PK_UNIQUE_CLAIM_ITEMS",
-      "detail": "3036 unique keys"
+      "detail": "2984 unique keys"
     },
     {
       "status": "PASS",
@@ -47,22 +47,32 @@
     {
       "status": "PASS",
       "rule": "PK_UNIQUE_ASSESSMENTS",
-      "detail": "951 unique keys"
+      "detail": "925 unique keys"
     },
     {
       "status": "PASS",
       "rule": "PK_UNIQUE_RESERVES",
-      "detail": "420 unique keys"
+      "detail": "862 unique keys"
     },
     {
       "status": "PASS",
       "rule": "PK_UNIQUE_SETTLEMENTS",
-      "detail": "246 unique keys"
+      "detail": "564 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_CLAIM_ADJUSTER_ASSIGNMENTS",
+      "detail": "1140 unique keys"
+    },
+    {
+      "status": "PASS",
+      "rule": "PK_UNIQUE_CLAIM_COVERAGE_ALLOCATIONS",
+      "detail": "1237 unique keys"
     },
     {
       "status": "PASS",
       "rule": "PK_UNIQUE_CLAIM_STATE_HISTORY",
-      "detail": "3195 unique keys"
+      "detail": "3555 unique keys"
     },
     {
       "status": "PASS",
@@ -156,193 +166,278 @@
     },
     {
       "status": "PASS",
+      "rule": "FK_CLAIM_ADJUSTER_ASSIGNMENTS.CLAIM_ID",
+      "detail": "All references valid -> claims"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIM_ADJUSTER_ASSIGNMENTS.ADJUSTER_ID",
+      "detail": "All references valid -> adjusters"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIM_COVERAGE_ALLOCATIONS.CLAIM_ID",
+      "detail": "All references valid -> claims"
+    },
+    {
+      "status": "PASS",
+      "rule": "FK_CLAIM_COVERAGE_ALLOCATIONS.COVERAGE_ID",
+      "detail": "All references valid -> coverages"
+    },
+    {
+      "status": "PASS",
       "rule": "FK_CLAIM_STATE_HISTORY.CLAIM_ID",
       "detail": "All references valid -> claims"
     },
     {
       "status": "PASS",
       "rule": "JOIN_CLAIM_MASTER_CONSISTENCY",
-      "detail": "claim customer/product, incident product, and item type must agree"
+      "detail": "claim customer/product, incident product, and item type agree"
     },
     {
       "status": "PASS",
       "rule": "JOIN_COVERAGE_POLICY_CONSISTENCY",
-      "detail": "claim coverage and policy coverage dates must agree"
+      "detail": "claim coverage and policy coverage dates agree"
     },
     {
       "status": "PASS",
       "rule": "JOIN_ACTIVE_SPECIALIST_ADJUSTER",
-      "detail": "assigned adjuster must be active and specialized"
+      "detail": "assigned adjuster is active and specialized"
     },
     {
       "status": "PASS",
       "rule": "JOIN_ASSESSMENT_ADJUSTER",
-      "detail": "assessment adjuster must match claim assignment"
+      "detail": "assessment adjuster matches claim assignment"
     },
     {
       "status": "PASS",
       "rule": "JOIN_SETTLEMENT_ASSESSMENT",
-      "detail": "settlement assessment must belong to the same claim"
+      "detail": "settlement assessment belongs to same claim"
+    },
+    {
+      "status": "PASS",
+      "rule": "JOIN_BRIDGE_ADJUSTER_ASSIGNMENTS",
+      "detail": "N:M claim_adjuster_assignments matches primary adjuster"
+    },
+    {
+      "status": "PASS",
+      "rule": "JOIN_BRIDGE_COVERAGE_ALLOCATIONS",
+      "detail": "N:M claim_coverage_allocations belongs to claim policy"
     },
     {
       "status": "PASS",
       "rule": "ENUM_POLICIES.STATUS",
-      "detail": ""
+      "detail": "All values in ['ACTIVE', 'CANCELLED', 'EXPIRED', 'LAPSED']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_POLICIES.PRODUCT_TYPE",
-      "detail": ""
+      "detail": "All values in ['AUTO', 'HEALTH', 'HOME', 'LIFE', 'TRAVEL']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_POLICIES.PAYMENT_FREQUENCY",
-      "detail": ""
+      "detail": "All values in ['ANNUAL', 'MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_POLICIES.UNDERWRITING_STATUS",
-      "detail": ""
+      "detail": "All values in ['APPROVED', 'CONDITIONAL', 'DECLINED']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_CLAIMS.STATUS",
-      "detail": ""
+      "detail": "All values in ['APPROVED', 'CLOSED', 'DENIED', 'PENDING_DOCUMENTS', 'SETTLED', 'SIU_INVESTIGATION', 'SUBMITTED', 'UNDER_REVIEW']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_CLAIMS.CLAIM_TYPE",
-      "detail": ""
+      "detail": "All values in ['AUTO', 'HEALTH', 'HOME', 'LIFE', 'TRAVEL']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_CLAIMS.PRIORITY",
-      "detail": ""
+      "detail": "All values in ['HIGH', 'LOW', 'MEDIUM', 'URGENT']"
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_CLAIM_ITEMS.STATUS",
+      "detail": "All values in ['APPROVED', 'DENIED', 'PENDING']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_INCIDENTS.SEVERITY",
-      "detail": ""
+      "detail": "All values in ['CRITICAL', 'HIGH', 'LOW', 'MEDIUM']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_DOCUMENTS.STATUS",
-      "detail": ""
+      "detail": "All values in ['RECEIVED', 'REJECTED', 'REQUESTED', 'VERIFIED']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_ASSESSMENTS.RECOMMENDATION",
-      "detail": ""
+      "detail": "All values in ['APPROVE', 'DENY', 'REVIEW']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_RESERVES.STATUS",
-      "detail": ""
+      "detail": "All values in ['CLOSED', 'OPEN']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_RESERVES.RESERVE_TYPE",
-      "detail": ""
+      "detail": "All values in ['CASE', 'EXPENSE']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_SETTLEMENTS.STATUS",
-      "detail": ""
+      "detail": "All values in ['APPROVED', 'PAID', 'PENDING', 'REJECTED']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_SETTLEMENTS.PAYMENT_METHOD",
-      "detail": ""
+      "detail": "All values in ['ACH', 'CHECK', 'DIRECT_DEPOSIT', 'WIRE_TRANSFER']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_ADJUSTERS.STATUS",
-      "detail": ""
+      "detail": "All values in ['ACTIVE', 'INACTIVE', 'ON_LEAVE']"
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_ADJUSTERS.ROLE_TIER",
+      "detail": "All values in ['SENIOR_ADJUSTER', 'SIU_SPECIALIST', 'STANDARD_ADJUSTER']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_CUSTOMERS.STATUS",
-      "detail": ""
+      "detail": "All values in ['ACTIVE', 'INACTIVE']"
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_CUSTOMERS.RISK_TIER",
+      "detail": "All values in ['ELEVATED', 'LOW', 'STANDARD']"
     },
     {
       "status": "PASS",
       "rule": "ENUM_COVERAGES.STATUS",
-      "detail": ""
+      "detail": "All values in ['ACTIVE', 'INACTIVE']"
+    },
+    {
+      "status": "PASS",
+      "rule": "ENUM_CLAIM_ADJUSTER_ASSIGNMENTS.ASSIGNMENT_ROLE",
+      "detail": "All values in ['CO_ADJUSTER', 'PRIMARY_ADJUSTER', 'SIU_INVESTIGATOR', 'SUPERVISOR_REVIEWER']"
     },
     {
       "status": "PASS",
       "rule": "DATE_POLICY_EFF_LT_EXP",
-      "detail": ""
+      "detail": "All policies have effective_date < expiration_date"
     },
     {
       "status": "PASS",
       "rule": "DATE_COVERAGE_MATCHES_POLICY",
-      "detail": ""
+      "detail": "All coverage dates align with parent policy"
+    },
+    {
+      "status": "PASS",
+      "rule": "DATE_INCIDENT_REPORTED_GE_INCIDENT",
+      "detail": "All incidents have reported_date >= incident_date"
     },
     {
       "status": "PASS",
       "rule": "DATE_CLAIM_AFTER_INCIDENT_REPORT",
-      "detail": ""
+      "detail": "All claims have submission_date >= incident reported_date"
     },
     {
       "status": "PASS",
       "rule": "DATE_SETTLEMENT_APPROVED_BEFORE_PAYMENT",
-      "detail": ""
+      "detail": "All settlements have approved_date <= payment_date"
     },
     {
       "status": "PASS",
       "rule": "ARITH_ITEM_COST_CONSISTENCY",
-      "detail": ""
+      "detail": "100% of claim_items satisfy round(unit_cost * quantity, 2) == claimed_amount"
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_CLAIM_AMOUNT_EQUALS_ITEM_SUM",
+      "detail": "100% of claims satisfy claim_amount == sum(claim_items.claimed_amount)"
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_ASSESSED_AMOUNT_EQUALS_APPROVED_ITEMS",
+      "detail": "100% of approved assessments equal sum(claim_items.approved_amount)"
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_DENIED_ELIGIBLE_IS_ZERO",
+      "detail": "100% of denied claims have eligible_amount == 0.00"
     },
     {
       "status": "PASS",
       "rule": "ARITH_ELIGIBLE_LE_LIMIT",
-      "detail": ""
+      "detail": "All eligible amounts <= coverage_limit"
     },
     {
       "status": "PASS",
       "rule": "ARITH_ELIGIBLE_FORMULA",
-      "detail": ""
+      "detail": "100% of assessments satisfy exact deductible & limit formula"
     },
     {
       "status": "PASS",
       "rule": "ARITH_RESERVE_RANGE",
-      "detail": ""
+      "detail": "All initial reserves within 80-120% of claim_amount"
     },
     {
       "status": "PASS",
       "rule": "ARITH_SETTLEMENT_LIMIT",
-      "detail": ""
+      "detail": "All non-anomaly settlements <= coverage_limit"
     },
     {
       "status": "PASS",
       "rule": "ARITH_SETTLEMENT_ASSESSMENT",
-      "detail": ""
+      "detail": "All non-anomaly settlements equal assessment.eligible_amount"
+    },
+    {
+      "status": "PASS",
+      "rule": "ARITH_BRIDGE_COVERAGE_ALLOCATION_SUM",
+      "detail": "100% of claim_coverage_allocations sum to claim_amount"
     },
     {
       "status": "PASS",
       "rule": "LIFECYCLE_VALID_TRANSITIONS",
-      "detail": ""
+      "detail": "All state transitions follow allowed state-machine edges"
     },
     {
       "status": "PASS",
       "rule": "LIFECYCLE_DENIED_HAS_REASON",
-      "detail": ""
+      "detail": "All denied claims record an explicit denial_reason"
     },
     {
       "status": "PASS",
       "rule": "LIFECYCLE_FINAL_STATE_MATCH",
-      "detail": ""
+      "detail": "All claims match their latest claim_state_history event"
     },
     {
-      "status": "WARN",
-      "rule": "DUP_INCIDENTS",
-      "detail": "5 potential duplicate incidents across 5 groups"
+      "status": "PASS",
+      "rule": "LIFECYCLE_DOCUMENT_GATING",
+      "detail": "Zero approved/settled claims have rejected mandatory documents"
     },
     {
-      "status": "WARN",
-      "rule": "DUP_SETTLEMENTS_PER_CLAIM",
-      "detail": "5 claims with multiple settlements (may be edge cases)"
+      "status": "PASS",
+      "rule": "LIFECYCLE_FRAUD_SIU_GATING",
+      "detail": "Zero fraud-flagged claims bypassed SIU/denial gating"
+    },
+    {
+      "status": "PASS",
+      "rule": "DUP_INCIDENTS_RECONCILED",
+      "detail": "All 5 duplicate incident groups are accounted for in ground_truth"
+    },
+    {
+      "status": "PASS",
+      "rule": "DUP_SETTLEMENTS_RECONCILED",
+      "detail": "All 5 multi-settlement claims are accounted for in ground_truth"
     },
     {
       "status": "PASS",
@@ -392,42 +487,47 @@
     {
       "status": "PASS",
       "rule": "REQUIRED_DOCUMENT_ROWS",
-      "detail": ""
+      "detail": "Required documents match ground-truth missing-document labels 100%"
     },
     {
       "status": "PASS",
       "rule": "EDGE_SEMANTICS_CLAIM_DATE_BEFORE_POLICY_START",
-      "detail": ""
+      "detail": "100% of labelled rows match exact anomaly condition"
     },
     {
       "status": "PASS",
       "rule": "EDGE_SEMANTICS_CLAIM_PAID_TWICE",
-      "detail": ""
+      "detail": "100% of labelled rows match exact anomaly condition"
     },
     {
       "status": "PASS",
       "rule": "EDGE_SEMANTICS_DUPLICATE_INCIDENT",
-      "detail": ""
+      "detail": "100% of labelled rows match exact anomaly condition"
     },
     {
       "status": "PASS",
       "rule": "EDGE_SEMANTICS_MISSING_MANDATORY_DOCUMENT",
-      "detail": ""
+      "detail": "100% of labelled rows match exact anomaly condition"
     },
     {
       "status": "PASS",
       "rule": "EDGE_SEMANTICS_POLICY_CANCELLED_BEFORE_INCIDENT",
-      "detail": ""
+      "detail": "100% of labelled rows match exact anomaly condition"
     },
     {
       "status": "PASS",
       "rule": "EDGE_SEMANTICS_SETTLEMENT_EXCEEDS_LIMIT",
-      "detail": ""
+      "detail": "100% of labelled rows match exact anomaly condition"
+    },
+    {
+      "status": "PASS",
+      "rule": "EDGE_ZERO_UNLABELLED_POLLUTION",
+      "detail": "Zero unlabelled early-incident or cancelled-policy claims in baseline"
     },
     {
       "status": "PASS",
       "rule": "FEATURE_OUTCOME_SEPARATION",
-      "detail": ""
+      "detail": "Zero outcome or fraud-label leakage in claims_input.csv"
     },
     {
       "status": "PASS",
@@ -456,8 +556,23 @@
     },
     {
       "status": "PASS",
+      "rule": "VOLUME_CLAIM_ADJUSTER_ASSIGNMENTS",
+      "detail": "1140 rows"
+    },
+    {
+      "status": "PASS",
+      "rule": "VOLUME_CLAIM_COVERAGE_ALLOCATIONS",
+      "detail": "1237 rows"
+    },
+    {
+      "status": "PASS",
       "rule": "VOLUME_CLAIM_TYPE_DISTRIBUTION",
-      "detail": "5 types: {'AUTO': 300, 'HOME': 200, 'HEALTH': 250, 'LIFE': 100, 'TRAVEL': 150}"
+      "detail": "5 types: {'AUTO': 300, 'HEALTH': 250, 'HOME': 200, 'LIFE': 100, 'TRAVEL': 150}"
+    },
+    {
+      "status": "PASS",
+      "rule": "MANIFEST_SHA256_INTEGRITY",
+      "detail": "All 46 exported artifacts match manifest SHA-256 checksums"
     }
   ]
 }

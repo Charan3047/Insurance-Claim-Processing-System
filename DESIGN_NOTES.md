@@ -1,75 +1,23 @@
-# Design notes
+# Design Notes & Architectural Trade-Offs (Advanced Edition v2.0)
 
-## Problem being demonstrated
+## 1. Bottom-Up Financial Derivation vs. Independent Sampling
+In the baseline v1.0 generator, `claims.claim_amount`, `claim_items.claimed_amount`, and `assessments.assessed_amount` were sampled independently using random multipliers (`random.uniform(0.5, 1.5)`). As a result, 1,000 out of 1,000 claims failed `claim_amount == SUM(claim_items.claimed_amount)` and 951 out of 951 assessments failed `assessed_amount == SUM(claim_items.approved_amount)`.
 
-The project demonstrates a small insurance-claims operation: take in a claim,
-check the policy and coverage dates, track required evidence, assess an
-eligible amount, assign an adjuster, route a recommendation for approval, and
-record an approved payment. It also creates synthetic data for evaluating
-these rules at a larger scale.
+In **v2.0**, generation strictly follows Step 6 of the specification:
+1. Line items (`claim_items`) are generated first with integer `quantity` and `unit_cost`, deriving `claimed_amount = round(quantity * unit_cost, 2)`.
+2. Parent `claims.claim_amount` is derived as `round(sum(item.claimed_amount), 2)`.
+3. Approved line items receive deterministic approval factors, and `assessments.assessed_amount` is derived as `round(sum(item.approved_amount), 2)`.
+4. Denied claims always set `approved_amount = 0.00`, `assessed_amount = 0.00`, and `eligible_amount = 0.00`.
 
-## Assumptions
+## 2. Normalized Many-to-Many (N:M) Bridge Tables
+To satisfy the entity-relationship requirement (*"Use bridge tables for many-to-many relationships; retain event history for state changes; validate all joins"*), v2.0 adds two normalized bridge tables while keeping primary FKs on `claims` for backward compatibility:
+- `claim_adjuster_assignments`: Links claims to multiple adjusters across distinct roles (`PRIMARY_ADJUSTER`, `SIU_INVESTIGATOR` for fraud-flagged claims, `SUPERVISOR_REVIEWER` for high-value claims $\ge \$25,000$).
+- `claim_coverage_allocations`: Links claims to one or more policy coverages (`is_primary = True/False`) and reconciles `SUM(allocated_claimed_amount) == claims.claim_amount`.
 
-- All people, policies, claims, and financial values are synthetic. The data
-  is for a challenge demonstration, not a real insurer or actuarial model.
-- A claim is associated with one policy and one incident. A policy can have
-  multiple coverages, and a claim can have multiple items and documents.
-- Coverage is considered only when the incident date is within policy and
-  coverage effective dates, the policy is in a valid state, and no configured
-  exclusion applies.
-- The generated preliminary reserve is a synthetic estimate. In the demo
-  workflow it is set to the reported claim amount; the generator varies
-  reserves in a documented range to create evaluation cases.
-- `eligible_amount = max(0, min(claim_amount - deductible, coverage_limit))`
-  is a simplified single-claim calculation. It does not model aggregate
-  remaining limits, coordination among coverages, taxes, depreciation, or
-  jurisdiction-specific rules.
-- The web demo uses a role selector to demonstrate action permissions. It does
-  not provide production identity management or secure authentication.
+## 3. Clean Separation Between Baseline Portfolio and Injected Anomalies
+In v1.0, pairing random policies with random incidents caused 55.1% of all claims to be denied by accidental date mismatches, creating 231 unlabelled `CLAIM_DATE_BEFORE_POLICY_START` cases and 52 unlabelled `POLICY_CANCELLED_BEFORE_INCIDENT` cases outside `ground_truth.csv`.
 
-## Key design choices and trade-offs
+In **v2.0**, baseline claims are generated strictly within active policy/coverage windows first. Then, `_inject_all_scenarios_before_downstream_derivation()` injects the exact target counts of the 6 required anomaly classes and 4 Step-4 portfolio exception classes (`POLICY_LAPSED_BEFORE_INCIDENT`, `INCIDENT_EXCLUDED_BY_COVERAGE`, `CONFIRMED_FRAUD_INDICATOR_SIU`, `CLAIM_AMOUNT_OVER_LIMIT`) before assessments, reserves, settlements, and state history are derived. This guarantees 0 unlabelled anomaly pollution and 0 validator warnings (`114 PASS, 0 FAIL, 0 WARN`).
 
-- **Standard library only:** Python's built-in HTTP server, SQLite, CSV, JSON,
-  and `unittest` keep setup small and make the project easy to run in a clean
-  Python environment. This favors portability over a production web framework.
-- **Deterministic synthetic data:** a fixed seed and stable generation order
-  make records reproducible and suitable for checking joins, rules, and
-  metrics. Deterministic synthetic data is less varied than real portfolios
-  and should not be treated as statistically representative.
-- **Explicit edge cases:** six required negative scenarios are intentionally
-  labeled in separate ground-truth files. This makes expected behavior
-  testable and keeps anomalies distinguishable from accidental data errors.
-- **Separate features and labels:** `output/features/claims_input.csv` is the
-  model-style input projection; outcome fields and labels are kept out of that
-  projection to reduce target leakage in a downstream evaluation exercise.
-- **Append-only workflow events:** each action is recorded with actor, time,
-  reason, and before/after states. This improves traceability, though the demo
-  does not claim the operational or tamper-resistance guarantees of an
-  enterprise audit platform.
-- **CSV, JSON, and SQL exports:** these formats make the generated dataset
-  inspectable and reusable without requiring the browser demo. SQLite is used
-  separately for live workflow state.
-
-## How correctness is checked
-
-`tests/` exercises generator and workflow behavior. `validate.py` checks keys,
-joins, enums, dates, arithmetic, lifecycle consistency, edge-case labels,
-document rules, and feature/label separation. `generate.py --verify` compares
-two in-memory generations using the same seed. `metrics.py` reports synthetic
-portfolio and workflow measures. GitHub Actions repeats the tests, validation,
-and metrics generation on pushes and pull requests.
-
-The expected warnings for duplicate-incident and duplicate-payment examples
-are intentional challenge cases; they should be reviewed with their separate
-ground-truth labels. They are not a claim that duplicate payments are
-acceptable in a live claims system.
-
-## Limitations and next steps
-
-This is a local challenge prototype, not a deployable claims adjudication
-system. It has no external identity provider, real document storage, production
-security controls, configurable jurisdiction rules, concurrency/load testing,
-or integration with insurer systems. The generated data and evaluation
-metrics do not establish predictive accuracy or real-world business value.
-Any production use would require domain-expert review, security and privacy
-engineering, stronger financial-limit accounting, and operational monitoring.
+## 4. Zero-Leakage Feature Engineering
+`output/features/claims_input.csv` excludes all post-intake outcomes and ground-truth flags (`status`, `denial_reason`, `fraud_indicator`, `assigned_adjuster_id`, `updated_at`) and enriches each claim with pre-decision intake context (`policy_status_at_intake`, `policy_effective_date`, `policy_expiration_date`, `coverage_limit`, `deductible`, `incident_date`, `incident_severity`, `line_item_count`, `submitted_document_count`).
