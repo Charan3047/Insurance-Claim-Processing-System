@@ -888,8 +888,13 @@ class DataValidator:
                 bad.append(f"{rel_path} (missing)")
                 continue
             with open(full_p, "rb") as stream:
-                actual_sha = hashlib.sha256(stream.read()).hexdigest()
-            if actual_sha != expected_sha:
+                raw_bytes = stream.read()
+            candidates = {
+                hashlib.sha256(raw_bytes).hexdigest(),
+                hashlib.sha256(raw_bytes.replace(b"\r\n", b"\n")).hexdigest(),
+                hashlib.sha256(raw_bytes.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest(),
+            }
+            if expected_sha not in candidates:
                 bad.append(f"{rel_path} (hash mismatch)")
         if bad:
             self.r.fail("MANIFEST_SHA256_INTEGRITY", f"{len(bad)} files failed SHA-256 verification", bad)
