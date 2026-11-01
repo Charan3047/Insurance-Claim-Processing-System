@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.venv/
+workflow.sqlite
+workflow.sqlite-shm
+workflow.sqlite-wal

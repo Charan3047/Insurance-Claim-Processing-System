@@ -1,0 +1,20 @@
+name: Claims processor checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run unit and workflow tests
+        run: python -m unittest discover -v
+      - name: Validate packaged dataset
+        run: python validate.py --data-dir output --json-report output/validation_report.json
+      - name: Generate business metrics
+        run: python metrics.py --data-dir output --output output/metrics.json
